@@ -27,7 +27,6 @@ export const TaskProvider = ({ children }) => {
 
         if (!response.ok) throw new Error('Impossible de charger les tâches depuis le serveur.');
         const data = await response.json();
-        console.log('Données brutes de l\'API:', JSON.stringify(data, null, 2));
         // Mapper due_date à dueDate
         const mappedTasks = data.map(task => ({
           ...task,

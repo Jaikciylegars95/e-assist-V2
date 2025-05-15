@@ -9,6 +9,8 @@ import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './components/LoginPage';
 import SignupForm from './components/signupForm'; // Importation correcte
+import Calendrier from './components/calendar';
+
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -40,6 +42,7 @@ function App() {
               }
             >
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="calendar" element={<Calendrier />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="TaskForm" element={<TaskForm />} />
               <Route path="settings" element={<SettingsPage />} />

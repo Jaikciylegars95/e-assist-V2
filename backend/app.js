@@ -1,13 +1,12 @@
-const dotenv = require('dotenv');
-dotenv.config();
+require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2');
+const mysql = require('mysql2'); // si tu veux utiliser les promesses : mysql2/promise
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
 
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/Tasks');
-const usersRoutes = require('./routes/users');  // <-- ajout
+const usersRoutes = require('./routes/users');
+const calendrierRoutes = require('./routes/calendrier');
 
 const app = express();
 
@@ -17,29 +16,32 @@ app.use(express.json());
 
 // Connexion à la base de données
 const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'taskflow',
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'taskflow',
 });
 
 connection.connect((err) => {
   if (err) {
     console.error('Erreur de connexion à la base de données:', err);
+    process.exit(1); // Arrêter le serveur en cas d'erreur critique
   } else {
     console.log('Connexion à la base de données réussie');
   }
 });
 
-// Rendre la connexion accessible aux routes
+// Rendre la connexion accessible aux routes via app.set
 app.set('db', connection);
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
-app.use('/api/users', usersRoutes);   // <-- ajout
+app.use('/api/users', usersRoutes);
+app.use('/api/calendrier', calendrierRoutes);
 
 // Démarrage du serveur
-app.listen(3001, () => {
-  console.log('Serveur backend démarré sur le port 3001');
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Serveur backend démarré sur le port ${PORT}`);
 });

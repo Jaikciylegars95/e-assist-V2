@@ -95,10 +95,20 @@ const Sidebar = () => {
           <span>Tâches</span>
         </NavLink>
 
-        <div className="flex items-center px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer">
+        {/* Bouton Calendrier modifié pour redirection */}
+        <NavLink
+          to="/Calendrier"
+          className={({ isActive }) =>
+            `flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
+              isActive
+                ? 'bg-primary-50 dark:bg-gray-700 text-primary-700 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`
+          }
+        >
           <Calendar size={20} className="mr-3" />
           <span>Calendrier</span>
-        </div>
+        </NavLink>
       </nav>
 
       {/* Bottom Section */}
