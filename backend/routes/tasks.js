@@ -32,6 +32,31 @@ async function fetchTasksDueThisWeek() {
   }
 }
 
+// PUT /api/tasks/:id
+router.put("/tasks/:id", authenticate, async (req, res) => {
+  const taskId = req.params.id;
+  const { title, description, due_date, status } = req.body;
+
+  try {
+    const task = await Task.findByPk(taskId);
+
+    if (!task) return res.status(404).json({ error: "Tâche non trouvée" });
+
+    // Mise à jour
+    task.title = title;
+    task.description = description;
+    task.due_date = due_date;
+    task.status = status;
+
+    await task.save();
+
+    return res.json(task);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 // ✅ Ajouter une tâche
 router.post('/', authMiddleware, (req, res) => {
   const { title, description, priority, status, due_date } = req.body;
@@ -79,6 +104,38 @@ router.get('/', authMiddleware, (req, res) => {
     res.status(200).json(results);
   });
 });
+
+// Exemple d'Express pour l'API notifications
+app.get('/api/tasks/notifications', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Requête pour les tâches arrivant à échéance (par ex. dans les 3 prochains jours)
+    const dueTasks = await db.query(`
+      SELECT id, title FROM tasks
+      WHERE due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '3 days'
+      AND completed = false
+      ORDER BY due_date ASC
+    `);
+
+    // Requête pour les tâches complétées
+    const completedTasks = await db.query(`
+      SELECT id, title FROM tasks
+      WHERE completed = true
+      ORDER BY updated_at DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      dueTasks: dueTasks.rows,
+      completedTasks: completedTasks.rows,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 
 // ✅ Récupérer une tâche par ID
 router.get('/:id', authMiddleware, (req, res) => {
