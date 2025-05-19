@@ -11,7 +11,16 @@ const Calendrier = () => {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/tasks');
+        // Récupérer le token stocké (ici dans localStorage)
+        const token = localStorage.getItem('token'); 
+
+        const response = await fetch('http://localhost:3001/api/tasks', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
         if (!response.ok) {
           throw new Error(`Erreur HTTP : ${response.status}`);
         }

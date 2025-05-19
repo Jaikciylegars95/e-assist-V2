@@ -4,7 +4,7 @@ const TaskContext = createContext(undefined);
 
 export const useTasks = () => {
   const context = useContext(TaskContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTasks doit être utilisé à l’intérieur d’un TaskProvider');
   }
   return context;
@@ -14,42 +14,36 @@ export const TaskProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Charger les tâches depuis l'API
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3001/api/tasks', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) throw new Error('Impossible de charger les tâches depuis le serveur.');
-        const data = await response.json();
-        // Mapper due_date à dueDate
-        const mappedTasks = data.map(task => ({
-          ...task,
-          dueDate: task.due_date
-        }));
-        setTasks(mappedTasks);
-        setLoading(false);
-      } catch (error) {
-        console.error('Erreur lors du chargement des tâches :', error.message);
-        setLoading(false);
-      }
-    };
-
     fetchTasks();
   }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:3001/api/tasks', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Erreur lors du chargement des tâches');
+      const data = await response.json();
+      const mapped = data.map(task => ({
+        ...task,
+        dueDate: task.due_date
+      }));
+      setTasks(mapped);
+    } catch (error) {
+      console.error('Erreur fetchTasks:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addTask = async (taskData) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Token d’authentification manquant.');
-      }
-
       const response = await fetch('http://localhost:3001/api/tasks', {
         method: 'POST',
         headers: {
@@ -59,25 +53,17 @@ export const TaskProvider = ({ children }) => {
         body: JSON.stringify(taskData)
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Échec de la création de la tâche.');
-      }
+      if (!response.ok) throw new Error('Erreur lors de l’ajout de la tâche');
+      await response.json();
 
-      const text = await response.text();
-      console.log('Réponse brute du backend (addTask):', text);
-
-      const nouvelleTache = text ? JSON.parse(text) : null;
-
-      if (nouvelleTache) {
-        // Mapper due_date à dueDate
-        const mappedTask = { ...nouvelleTache, dueDate: nouvelleTache.due_date };
-        setTasks(prev => [...prev, mappedTask]);
-      } else {
-        console.warn('La réponse du backend est vide, tâche ajoutée en base mais pas mise à jour localement.');
-      }
+      // Attendre un court instant avant de rafraîchir
+      setTimeout(() => {
+        fetchTasks(); // Recharger les tâches à jour
+      }, 1000); // 1 seconde
+      return true;
     } catch (error) {
-      console.error('Erreur lors de l’ajout de la tâche :', error.message);
+      console.error('Erreur addTask:', error.message);
+      return false;
     }
   };
 
@@ -93,16 +79,12 @@ export const TaskProvider = ({ children }) => {
         body: JSON.stringify(updates)
       });
 
-      if (!response.ok) {
-        throw new Error('Échec de la mise à jour de la tâche.');
-      }
-
-      const tacheModifiee = await response.json();
-      // Mapper due_date à dueDate
-      const mappedTask = { ...tacheModifiee, dueDate: tacheModifiee.due_date };
-      setTasks(prev => prev.map(task => task.id === id ? mappedTask : task));
+      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
+      const updated = await response.json();
+      const mapped = { ...updated, dueDate: updated.due_date };
+      setTasks(prev => prev.map(t => (t.id === id ? mapped : t)));
     } catch (error) {
-      console.error('Erreur lors de la mise à jour :', error.message);
+      console.error('Erreur updateTask:', error.message);
     }
   };
 
@@ -116,33 +98,27 @@ export const TaskProvider = ({ children }) => {
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Échec de la suppression de la tâche.');
-      }
-
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
       setTasks(prev => prev.filter(task => task.id !== id));
     } catch (error) {
-      console.error('Erreur lors de la suppression :', error.message);
+      console.error('Erreur deleteTask:', error.message);
     }
   };
 
-  const getTasksByStatus = (status) => {
-    return tasks.filter(task => task.status === status);
-  };
+  const getTasksByStatus = (status) => tasks.filter(task => task.status === status);
 
-  const getTaskById = (id) => {
-    return tasks.find(task => task.id === id);
-  };
+  const getTaskById = (id) => tasks.find(task => task.id === id);
 
   return (
     <TaskContext.Provider value={{
       tasks,
+      loading,
       addTask,
       updateTask,
       deleteTask,
       getTasksByStatus,
       getTaskById,
-      loading
+      fetchTasks
     }}>
       {children}
     </TaskContext.Provider>

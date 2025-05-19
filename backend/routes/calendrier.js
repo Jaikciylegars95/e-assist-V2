@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
-const router = express.Router();
+const verifyToken = require('../middleware/authMiddleware'); // <-- importe ton middleware d'auth
 const app = express();
 const PORT = 3001;
 
@@ -19,8 +19,8 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Route GET /api/tasks (note bien que c'est une route relative)
-app.get('/api/tasks', async (req, res) => {
+// Route GET /api/tasks avec authentification
+app.get('/api/tasks', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, title, created_at, due_date FROM tasks');
     res.json(rows);
@@ -30,4 +30,6 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
-module.exports = router;
+app.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
+});

@@ -68,22 +68,6 @@ const Dashboard = () => {
   sunday.setHours(23, 59, 59, 999);
 
   // Débogage détaillé
-  if (!loading) {
-    console.log('Tâches brutes:', tasks);
-    console.log('todayIso:', todayIso);
-    console.log('monday:', monday, 'sunday:', sunday);
-    tasks.forEach(task => {
-      console.log(`Tâche ${task.id}:`, {
-        dueDateRaw: task.dueDate,
-        dueDateType: typeof task.dueDate,
-        dueDateExists: task.dueDate !== null && task.dueDate !== undefined,
-        dueDateParsed: task.dueDate ? new Date(task.dueDate) : null,
-        dueDateFormatted: task.dueDate ? formatDateLocal(task.dueDate) : null,
-        isValid: isValidDate(task.dueDate),
-        status: task.status
-      });
-    });
-  }
 
   // Toutes les tâches
   const totalTasks = tasks.length;

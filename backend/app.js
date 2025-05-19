@@ -6,7 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/Tasks');
 const usersRoutes = require('./routes/users');
-const calendrierRoutes = require('./routes/calendrier');
+
 
 const app = express();
 
@@ -38,7 +38,7 @@ app.set('db', connection);
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', usersRoutes);
-app.use('/api/calendrier', calendrierRoutes);
+
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 3001;

@@ -2,7 +2,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const authMiddleware = require('../middleware/authmiddleware'); // Importer le middleware d'authentification
+const authMiddleware = require('../middleware/authMiddleware'); // Importer le middleware d'authentification
 
 const router = express.Router();
 
