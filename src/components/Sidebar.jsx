@@ -97,7 +97,7 @@ const Sidebar = () => {
 
         {/* Bouton Calendrier modifié pour redirection */}
         <NavLink
-          to="/Calendrier"
+          to="/Calendar"
           className={({ isActive }) =>
             `flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
               isActive

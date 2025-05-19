@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, Views } from "react-big-calendar";
-import localizer from "./localizer"; // Vérifie que ce fichier exporte bien le localizer
+import localizer from "./localizer";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 const Calendrier = () => {
@@ -12,7 +12,8 @@ const Calendrier = () => {
     const fetchTasks = async () => {
       try {
         // Récupérer le token stocké (ici dans localStorage)
-        const token = localStorage.getItem('token'); 
+        const token = localStorage.getItem('token');
+        console.log('Token récupéré :', token);
 
         const response = await fetch('http://localhost:3001/api/tasks', {
           headers: {
@@ -26,19 +27,20 @@ const Calendrier = () => {
         }
 
         const data = await response.json();
+        console.log('Données reçues du backend :', data);
 
         const formattedEvents = data.map((task) => {
-          const createdAt = task.created_at ? new Date(task.created_at) : null;
-          const dueDate = task.due_date ? new Date(task.due_date) : null;
+          const startDate = task.created_at ? new Date(task.created_at) : new Date();
+          const endDate = task.due_date ? new Date(task.due_date) : new Date();
 
-          const isValidStart = createdAt instanceof Date && !isNaN(createdAt);
-          const isValidEnd = dueDate instanceof Date && !isNaN(dueDate);
+          const isValidStart = startDate instanceof Date && !isNaN(startDate);
+          const isValidEnd = endDate instanceof Date && !isNaN(endDate);
 
           return {
             id: task.id,
             title: task.title || 'Tâche sans titre',
-            start: isValidStart ? createdAt : new Date(),
-            end: isValidEnd ? dueDate : new Date(),
+            start: isValidStart ? startDate : new Date(),
+            end: isValidEnd ? endDate : new Date(),
           };
         });
 
