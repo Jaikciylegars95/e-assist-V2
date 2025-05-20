@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTasks } from '../contexts/TaskContext';
 import TaskColumn from '../components/TaskColumn';
 import TaskForm from '../components/TaskForm';
 import { CheckSquare, Clock, CheckCircle, PlusCircle } from 'lucide-react';
 
 const TasksPage = () => {
-  const { tasks, addTask, updateTask, deleteTask, getTasksByStatus } = useTasks();
+  const { addTask, updateTask, deleteTask, getTasksByStatus } = useTasks();
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const navigate = useNavigate();
+
   const todoTasks = getTasksByStatus('todo');
   const inProgressTasks = getTasksByStatus('in-progress');
   const completedTasks = getTasksByStatus('completed');
+
+  // Navigation vers la page détail de la tâche
+  const handleViewDetail = (taskId) => {
+    navigate(`/tasks/${taskId}`);
+  };
 
   const handleAddTask = async (taskData) => {
     setIsSubmitting(true);
@@ -54,7 +62,7 @@ const TasksPage = () => {
             setEditingTask(undefined);
           }}
           initialData={editingTask}
-          disabled={isSubmitting} // à gérer dans TaskForm pour désactiver les champs / bouton
+          disabled={isSubmitting}
         />
       )}
 
@@ -77,6 +85,7 @@ const TasksPage = () => {
           icon={<CheckSquare size={18} className="text-gray-600 dark:text-gray-400" />}
           onEditTask={handleEditTask}
           onDeleteTask={deleteTask}
+          onViewDetail={handleViewDetail}
         />
 
         <TaskColumn
@@ -86,6 +95,7 @@ const TasksPage = () => {
           icon={<Clock size={18} className="text-accent-600 dark:text-accent-400" />}
           onEditTask={handleEditTask}
           onDeleteTask={deleteTask}
+          onViewDetail={handleViewDetail}
         />
 
         <TaskColumn
@@ -95,6 +105,7 @@ const TasksPage = () => {
           icon={<CheckCircle size={18} className="text-green-600 dark:text-green-400" />}
           onEditTask={handleEditTask}
           onDeleteTask={deleteTask}
+          onViewDetail={handleViewDetail}
         />
       </div>
     </div>

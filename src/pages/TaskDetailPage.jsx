@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DetailTache from "../components/detailTache";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const TaskDetailPage = () => {
   const { id } = useParams();
@@ -37,13 +39,30 @@ const TaskDetailPage = () => {
 
   const handleSave = (updatedTask) => {
     setTask(updatedTask);
-    alert("Tâche sauvegardée avec succès !");
+    toast.success("Tâche sauvegardée avec succès !");
+    setTimeout(() => {
+        window.location.href = "/tasks";
+    }, 3000);
   };
+  
 
   if (loading) return <p>Chargement de la tâche...</p>;
   if (error) return <p style={{ color: "red" }}>Erreur : {error}</p>;
 
-  return <DetailTache task={task} onClose={handleClose} onSave={handleSave} />;
+  return (
+    <>
+      <DetailTache task={task} onClose={handleClose} onSave={handleSave} />
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        pauseOnFocusLoss
+      />
+    </>
+  );
 };
 
 export default TaskDetailPage;

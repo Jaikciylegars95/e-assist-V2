@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 const DetailTache = ({ task, onClose, onSave }) => {
@@ -9,6 +9,8 @@ const DetailTache = ({ task, onClose, onSave }) => {
     status: task.status || "à faire",
     priority: task.priority || "faible",
   });
+
+  const [creator, setCreator] = useState({ nom: "", prenom: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -51,59 +53,118 @@ const DetailTache = ({ task, onClose, onSave }) => {
     }
   };
 
+  useEffect(() => {
+    const fetchCreator = async () => {
+      const token = localStorage.getItem("token");
+      try {
+        const response = await fetch(`http://localhost:3001/api/users/${task.user_id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+  
+        if (!response.ok) throw new Error("Utilisateur non trouvé");
+  
+        const data = await response.json();
+        setCreator({ nom: data.nom, prenom: data.prenom, poste: data.poste });
+      } catch (error) {
+        console.error("Erreur lors de la récupération du créateur :", error.message);
+      }
+    };
+  
+    if (task.user_id) {
+      fetchCreator();
+    }
+  }, [task.user_id]);
+  
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-tr from-blue-100 via-white to-pink-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="max-w-3xl mx-auto py-20 px-4"
+        className="max-w-5xl mx-auto py-20 px-4"
       >
         <h1 className="text-4xl font-bold text-center text-gray-800 dark:text-white mb-10">
           Modifier la tâche
         </h1>
 
-        <form className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Titre
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={form.title}
-              onChange={handleChange}
-              className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
+        <form className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Colonne 1 */}
+          <div className="space-y-6">
+            {/* Créé par */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Créé par
+              </label>
+              <input
+                type="text"
+                value={`${creator.prenom} ${creator.nom}`}
+                disabled
+                className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"
+              />
+            </div>
+
+            {/* Date de mise à jour */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Dernière mise à jour
+              </label>
+              <input
+                type="text"
+                value={new Date(task.updated_at).toLocaleString()}
+                disabled
+                className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-not-allowed"
+              />
+            </div>
+
+            {/* Titre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Titre
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Description
+              </label>
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                rows={5}
+                className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              ></textarea>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              rows={4}
-              className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            ></textarea>
-          </div>
+          {/* Colonne 2 */}
+          <div className="space-y-6">
+            {/* Date limite */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Date limite
+              </label>
+              <input
+                type="date"
+                name="due_date"
+                value={form.due_date}
+                onChange={handleChange}
+                className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Date limite
-            </label>
-            <input
-              type="date"
-              name="due_date"
-              value={form.due_date}
-              onChange={handleChange}
-              className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Statut */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Statut
@@ -114,12 +175,13 @@ const DetailTache = ({ task, onClose, onSave }) => {
                 onChange={handleChange}
                 className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                <option value="à faire">À faire</option>
-                <option value="en cours">En cours</option>
-                <option value="terminé">Terminé</option>
+                <option value="todo">À faire</option>
+                <option value="in-progress">En cours</option>
+                <option value="completed">Terminé</option>
               </select>
             </div>
 
+            {/* Priorité */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Priorité
@@ -130,33 +192,34 @@ const DetailTache = ({ task, onClose, onSave }) => {
                 onChange={handleChange}
                 className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                <option value="faible">Faible</option>
-                <option value="modéré">Modéré</option>
-                <option value="ultra">Ultra</option>
+                <option value="low">Faible</option>
+                <option value="medium">Modéré</option>
+                <option value="high">Ultra</option>
               </select>
             </div>
-          </div>
 
-          {error && (
-            <p className="text-red-500 font-semibold">{error}</p>
-          )}
+            {error && (
+              <p className="text-red-500 font-semibold">{error}</p>
+            )}
 
-          <div className="flex justify-between items-center mt-8">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 text-gray-800 dark:text-white bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              {saving ? "Enregistrement..." : "Enregistrer"}
-            </button>
+            {/* Boutons */}
+            <div className="flex justify-between items-center mt-8">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2 text-gray-800 dark:text-white bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                {saving ? "Enregistrement..." : "Enregistrer"}
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

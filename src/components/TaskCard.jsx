@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 🔥 Pour la redirection
 import { format } from 'date-fns';
 import { Clock, Flag, MoreHorizontal } from 'lucide-react';
 
@@ -32,9 +33,10 @@ const PriorityBadge = ({ priority }) => {
   }
 };
 
-const TaskCard = ({ task, onEdit, onDelete }) => {
+const TaskCard = ({ task, onDelete }) => {
   const [showOptions, setShowOptions] = useState(false);
-  
+  const navigate = useNavigate(); // ✅ Pour navigation
+
   const statusClasses = {
     'todo': 'border-l-4 border-gray-400',
     'in-progress': 'border-l-4 border-accent-500',
@@ -67,7 +69,7 @@ const TaskCard = ({ task, onEdit, onDelete }) => {
                 <li>
                   <button
                     onClick={() => {
-                      onEdit(task);
+                      navigate(`/tasks/${task.id}`); // <-- correction ici
                       setShowOptions(false);
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"

@@ -7,7 +7,8 @@ const TaskColumn = ({
   status, 
   icon, 
   onEditTask, 
-  onDeleteTask 
+  onDeleteTask,
+  onViewDetail // ajout
 }) => {
   const columnColors = {
     'todo': 'border-t-gray-400',
@@ -36,7 +37,8 @@ const TaskColumn = ({
               key={task.id} 
               task={task} 
               onEdit={onEditTask} 
-              onDelete={onDeleteTask} 
+              onDelete={onDeleteTask}
+              onViewDetail={onViewDetail} // passe onViewDetail à TaskCard
             />
           ))
         ) : (

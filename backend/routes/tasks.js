@@ -35,7 +35,10 @@ async function fetchTasksDueThisWeek() {
 // PUT /api/tasks/:id
 router.put("/tasks/:id", authenticate, async (req, res) => {
   const taskId = req.params.id;
-  const { title, description, due_date, status } = req.body;
+  
+  console.log("Corps reçu pour mise à jour :", req.body);
+
+  const { title, description, due_date, status, priority } = req.body;
 
   try {
     const task = await Task.findByPk(taskId);
@@ -47,6 +50,7 @@ router.put("/tasks/:id", authenticate, async (req, res) => {
     task.description = description;
     task.due_date = due_date;
     task.status = status;
+    task.priority = priority; // Ajouté ici
 
     await task.save();
 
@@ -56,6 +60,7 @@ router.put("/tasks/:id", authenticate, async (req, res) => {
     return res.status(500).json({ error: "Erreur serveur" });
   }
 });
+
 
 // ✅ Ajouter une tâche
 router.post('/', authMiddleware, (req, res) => {
