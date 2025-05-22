@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Search, Plus, Menu, X, ChevronDown } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -19,7 +18,6 @@ const Header = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
   const [ignoredTaskIds, setIgnoredTaskIds] = useState(() => {
-    // Charger les IDs ignorés depuis localStorage au démarrage
     const saved = localStorage.getItem('ignoredTaskIds');
     return saved ? JSON.parse(saved) : [];
   });
@@ -47,7 +45,6 @@ const Header = () => {
     completed: 'Terminé'
   };
 
-  // Sauvegarder ignoredTaskIds dans localStorage à chaque mise à jour
   useEffect(() => {
     localStorage.setItem('ignoredTaskIds', JSON.stringify(ignoredTaskIds));
     console.log('ignoredTaskIds mis à jour:', ignoredTaskIds);
@@ -94,7 +91,6 @@ const Header = () => {
       }
 
       console.log('Notifications récupérées:', data);
-      // Filtrer les completedTasks pour exclure les tâches ignorées
       setDueTasks(data.dueTasks || []);
       setCompletedTasks(
         (data.completedTasks || []).filter(task => !ignoredTaskIds.includes(task.id))
@@ -181,7 +177,6 @@ const Header = () => {
     const isDark = document.documentElement.classList.contains('dark');
     setIsNotificationsOpen(false);
 
-    // Afficher les détails de la tâche
     await Swal.fire({
       title: task.title,
       html: `
@@ -204,21 +199,19 @@ const Header = () => {
 
     if (isCompleted) {
       console.log(`Marquer la tâche comme ignorée, ID: ${task.id}`);
-      // Ajouter l'ID de la tâche à ignoredTaskIds
       setIgnoredTaskIds(prev => {
         const newIgnored = [...prev, task.id];
         console.log('Nouveau ignoredTaskIds:', newIgnored);
         return newIgnored;
       });
-      // Supprimer la tâche de completedTasks
       setCompletedTasks(prev => {
         const newTasks = prev.filter(t => t.id !== task.id);
         console.log('Nouveau completedTasks:', newTasks);
         return newTasks;
       });
+    } else {
+      navigate(`/tasks/${task.id}`);
     }
-
-    navigate(`/tasks/${task.id}`);
   };
 
   const toggleNotifications = () => setIsNotificationsOpen(prev => !prev);
@@ -266,7 +259,7 @@ const Header = () => {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Toutes les 60 secondes
+    const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -324,11 +317,14 @@ const Header = () => {
       if (response.ok) {
         const fullName = `${data.nom} ${data.prenom}`;
         const initials = `${data.nom?.charAt(0)?.toUpperCase() || ''}${data.prenom?.charAt(0)?.toUpperCase() || ''}` || 'U';
+        const hireDate = data.dateEmbauche && !isNaN(new Date(data.dateEmbauche).getTime())
+          ? new Date(data.dateEmbauche).toLocaleDateString('fr-FR')
+          : 'Non spécifié';
         return {
           fullName,
           initials,
           position: data.poste || 'Non spécifié',
-          hireDate: data.dateEmbauche ? new Date(data.dateEmbauche).toLocaleDateString('fr-FR') : 'Non spécifié',
+          hireDate,
           profilePicture: data.profilePicture || 'https://via.placeholder.com/40'
         };
       }
