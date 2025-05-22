@@ -1,66 +1,9 @@
-// routes/tasks.js
+// routes/Tasks.js
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const authMiddleware = require('../middleware/authMiddleware'); // Importer le middleware d'authentification
+const authMiddleware = require('../middleware/authmiddleware'); // Importer le middleware d'authentification
 
 const router = express.Router();
-
-//récuperation des taches qui arrive a echeances
-// Exemple fonction pour récupérer les tâches dues cette semaine
-async function fetchTasksDueThisWeek() {
-  try {
-    const token = localStorage.getItem('token'); // ou autre méthode pour récupérer le JWT
-
-    const response = await fetch('http://ton-backend-url/api/tasks/due-this-week', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,  // Passe le token JWT dans l'en-tête
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Erreur lors de la récupération des tâches');
-    }
-
-    const tasks = await response.json();
-    return tasks;
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
-}
-
-// PUT /api/tasks/:id
-router.put("/tasks/:id", authenticate, async (req, res) => {
-  const taskId = req.params.id;
-  
-  console.log("Corps reçu pour mise à jour :", req.body);
-
-  const { title, description, due_date, status, priority } = req.body;
-
-  try {
-    const task = await Task.findByPk(taskId);
-
-    if (!task) return res.status(404).json({ error: "Tâche non trouvée" });
-
-    // Mise à jour
-    task.title = title;
-    task.description = description;
-    task.due_date = due_date;
-    task.status = status;
-    task.priority = priority; // Ajouté ici
-
-    await task.save();
-
-    return res.json(task);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Erreur serveur" });
-  }
-});
-
 
 // ✅ Ajouter une tâche
 router.post('/', authMiddleware, (req, res) => {
@@ -110,38 +53,6 @@ router.get('/', authMiddleware, (req, res) => {
   });
 });
 
-// Exemple d'Express pour l'API notifications
-app.get('/api/tasks/notifications', async (req, res) => {
-  try {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-    // Requête pour les tâches arrivant à échéance (par ex. dans les 3 prochains jours)
-    const dueTasks = await db.query(`
-      SELECT id, title FROM tasks
-      WHERE due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '3 days'
-      AND completed = false
-      ORDER BY due_date ASC
-    `);
-
-    // Requête pour les tâches complétées
-    const completedTasks = await db.query(`
-      SELECT id, title FROM tasks
-      WHERE completed = true
-      ORDER BY updated_at DESC
-      LIMIT 10
-    `);
-
-    res.json({
-      dueTasks: dueTasks.rows,
-      completedTasks: completedTasks.rows,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-
 // ✅ Récupérer une tâche par ID
 router.get('/:id', authMiddleware, (req, res) => {
   const connection = req.app.get('db');
@@ -158,9 +69,9 @@ router.get('/:id', authMiddleware, (req, res) => {
 });
 
 // ✅ Modifier une tâche
-router.put('/:task_id', authMiddleware, (req, res) => {
+router.put('/:id', authMiddleware, (req, res) => {
   const connection = req.app.get('db');
-  const { task_id } = req.params;
+  const taskId = req.params.id;
   const { title, description, priority, status, due_date } = req.body;
 
   const sql = `
@@ -169,7 +80,7 @@ router.put('/:task_id', authMiddleware, (req, res) => {
     WHERE id = ? AND user_id = ?
   `;
 
-  connection.query(sql, [title, description, priority, status, due_date, task_id, req.user_id], (err, result) => {
+  connection.query(sql, [title, description, priority, status, due_date, taskId, req.user_id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Erreur lors de la modification' });
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Tâche non trouvée' });
@@ -179,13 +90,13 @@ router.put('/:task_id', authMiddleware, (req, res) => {
 });
 
 // ✅ Supprimer une tâche
-router.delete('/:task_id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, (req, res) => {
   const connection = req.app.get('db');
-  const { task_id } = req.params;
+  const taskId = req.params.id;
 
   const sql = 'DELETE FROM tasks WHERE id = ? AND user_id = ?';
 
-  connection.query(sql, [task_id, req.user_id], (err, result) => {
+  connection.query(sql, [taskId, req.user_id], (err, result) => {
     if (err) return res.status(500).json({ error: 'Erreur lors de la suppression' });
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Tâche non trouvée' });
@@ -194,6 +105,55 @@ router.delete('/:task_id', authMiddleware, (req, res) => {
   });
 });
 
+/*// ✅ Route notifications corrigée, protégée par authMiddleware
+router.get('/notifications', authMiddleware, (req, res) => {
+  const connection = req.app.get('db');
+  const user_id = req.user_id;
+  // Aujourd’hui en format YYYY-MM-DD
+  const today = new Date().toISOString().slice(0, 10);
 
+  // Intervalle de 3 jours après aujourd'hui
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 3);
+  const future = futureDate.toISOString().slice(0, 10);
+
+  // Requête tâches à échéance (dans les 3 jours)
+  const dueSql = `
+    SELECT id, title, due_date
+    FROM tasks
+    WHERE user_id = ? 
+      AND due_date BETWEEN ? AND ?
+      AND status != 'completed'
+    ORDER BY due_date ASC
+  `;
+
+  // Requête tâches complétées récemment (10 dernières)
+  const completedSql = `
+    SELECT id, title, due_date, status
+    FROM tasks
+    WHERE user_id = ? AND status = 'completed'
+    ORDER BY due_date DESC
+    LIMIT 10
+  `;
+
+  connection.query(dueSql, [user_id, today, future], (err, dueResults) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Erreur lors de la récupération des notifications' });
+    }
+
+    connection.query(completedSql, [user_id], (err, completedResults) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Erreur lors de la récupération des notifications' });
+      }
+
+      res.json({
+        dueTasks: dueResults,
+        completedTasks: completedResults,
+      });
+    });
+  });
+});*/
 
 module.exports = router;

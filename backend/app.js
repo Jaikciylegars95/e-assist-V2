@@ -4,14 +4,18 @@ const mysql = require('mysql2'); // si tu veux utiliser les promesses : mysql2/p
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
-const taskRoutes = require('./routes/Tasks');
+const taskRoutes = require('./routes/tasks');
 const usersRoutes = require('./routes/users');
+const notificationsRoutes = require('./routes/notifications');
 
 
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
 
 // Connexion à la base de données
