@@ -1,13 +1,12 @@
 require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2'); // si tu veux utiliser les promesses : mysql2/promise
+const mysql = require('mysql2');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
 const usersRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
-
 
 const app = express();
 
@@ -42,7 +41,18 @@ app.set('db', connection);
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/notifications', notificationsRoutes); // Ajout de la route manquante
 
+// Gestion des erreurs 404
+app.use((req, res, next) => {
+  res.status(404).json({ error: 'Endpoint non trouvé' });
+});
+
+// Gestion des erreurs générales
+app.use((err, req, res, next) => {
+  console.error('Erreur serveur:', err);
+  res.status(500).json({ error: 'Erreur interne du serveur' });
+});
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 3001;

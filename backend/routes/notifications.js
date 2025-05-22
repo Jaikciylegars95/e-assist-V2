@@ -11,6 +11,7 @@ router.get('/', authMiddleware, (req, res) => {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 3);
   const future = futureDate.toISOString().slice(0, 10);
+
   const dueSql = `
     SELECT id, title, due_date
     FROM tasks
@@ -26,16 +27,17 @@ router.get('/', authMiddleware, (req, res) => {
     ORDER BY due_date DESC
     LIMIT 10
   `;
+
   connection.query(dueSql, [user_id, today, future], (err, dueResults) => {
     if (err) {
       console.error('Erreur SQL dueTasks:', err);
-      return res.status(500).json({ error: 'Erreur lors de la récupération des notifications' });
+      return res.status(500).json({ error: 'Erreur lors de la récupération des tâches à échéance' });
     }
     console.log('dueTasks:', dueResults);
     connection.query(completedSql, [user_id], (err, completedResults) => {
       if (err) {
         console.error('Erreur SQL completedTasks:', err);
-        return res.status(500).json({ error: 'Erreur lors de la récupération des notifications' });
+        return res.status(500).json({ error: 'Erreur lors de la récupération des tâches complétées' });
       }
       console.log('completedTasks:', completedResults);
       res.json({
