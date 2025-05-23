@@ -21,6 +21,10 @@ const Header = () => {
     const saved = localStorage.getItem('ignoredTaskIds');
     return saved ? JSON.parse(saved) : [];
   });
+  const [consultedTaskIds, setConsultedTaskIds] = useState(() => {
+    const saved = localStorage.getItem('consultedTaskIds');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [userData, setUserData] = useState({
     fullName: 'Utilisateur',
     initials: 'U',
@@ -49,6 +53,11 @@ const Header = () => {
     localStorage.setItem('ignoredTaskIds', JSON.stringify(ignoredTaskIds));
     console.log('ignoredTaskIds mis à jour:', ignoredTaskIds);
   }, [ignoredTaskIds]);
+
+  useEffect(() => {
+    localStorage.setItem('consultedTaskIds', JSON.stringify(consultedTaskIds));
+    console.log('consultedTaskIds mis à jour:', consultedTaskIds);
+  }, [consultedTaskIds]);
 
   const fetchNotifications = async () => {
     try {
@@ -93,7 +102,9 @@ const Header = () => {
       console.log('Notifications récupérées:', data);
       setDueTasks(data.dueTasks || []);
       setCompletedTasks(
-        (data.completedTasks || []).filter(task => !ignoredTaskIds.includes(task.id))
+        (data.completedTasks || []).filter(
+          task => !ignoredTaskIds.includes(task.id) && !consultedTaskIds.includes(task.id)
+        )
       );
     } catch (error) {
       console.error('Erreur réseau ou parsing JSON:', error);
@@ -198,11 +209,11 @@ const Header = () => {
     });
 
     if (isCompleted) {
-      console.log(`Marquer la tâche comme ignorée, ID: ${task.id}`);
-      setIgnoredTaskIds(prev => {
-        const newIgnored = [...prev, task.id];
-        console.log('Nouveau ignoredTaskIds:', newIgnored);
-        return newIgnored;
+      console.log(`Marquer la tâche comme consultée, ID: ${task.id}`);
+      setConsultedTaskIds(prev => {
+        const newConsulted = [...prev, task.id];
+        console.log('Nouveau consultedTaskIds:', newConsulted);
+        return newConsulted;
       });
       setCompletedTasks(prev => {
         const newTasks = prev.filter(t => t.id !== task.id);
@@ -240,7 +251,7 @@ const Header = () => {
       }
     }).then((result) => {
       if (result.isConfirmed) {
-        localStorage.clear();
+        localStorage.removeItem('token');
         navigate('/login');
         toast.success("Déconnexion réussie 👋", {
           position: "top-center",
