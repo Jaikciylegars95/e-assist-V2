@@ -77,7 +77,6 @@ const Header = () => {
       });
 
       const textResponse = await response.text();
-      console.log('Réponse brute du serveur:', textResponse);
 
       const data = JSON.parse(textResponse);
 
@@ -99,7 +98,6 @@ const Header = () => {
         return;
       }
 
-      console.log('Notifications récupérées:', data);
       setDueTasks(data.dueTasks || []);
       setCompletedTasks(
         (data.completedTasks || []).filter(

@@ -36,7 +36,6 @@ const Dashboard = () => {
       if (!t?.id) {
         console.warn(`Tâche à l'index ${index} sans ID:`, t);
       }
-      console.log(`Tâche ${index} dueDate:`, t?.dueDate, `due_date:`, t?.due_date);
     });
     const idCounts = validTasks.reduce((acc, t) => {
       acc[t.id] = (acc[t.id] || 0) + 1;
@@ -263,7 +262,6 @@ const Dashboard = () => {
                     return false;
                   }
                   const dueDateLocal = formatDateLocal(date);
-                  console.log(`Comparaison pour tâche ${t.id} (${t.title}): dueDateLocal=${dueDateLocal}, todayIso=${todayIso}`);
                   return dueDateLocal === todayIso && t.status !== 'completed';
                 })
                 .map((t) => (

@@ -18,7 +18,6 @@ export const TaskProvider = ({ children }) => {
     return tasks.filter((t) => {
       const key = `${t.title.toLowerCase()}|${t.due_date || ''}|${t.user_id || ''}`;
       if (seen.has(key)) {
-        console.warn(`Tâche dupliquée ignorée : ${t.title} (ID: ${t.id})`);
         return false;
       }
       seen.set(key, true);
@@ -32,7 +31,6 @@ export const TaskProvider = ({ children }) => {
 
   const normalizeDate = (dateStr) => {
     if (!dateStr) {
-      console.warn('Date absente');
       return null;
     }
     try {
@@ -55,7 +53,6 @@ export const TaskProvider = ({ children }) => {
       setError(null);
       try {
         const response = await getTasks();
-        console.log('Réponse API brute (fetchTasks):', response.data);
 
         let allTasks = [];
         if (response.data.dueTasks && response.data.completedTasks) {
@@ -77,13 +74,12 @@ export const TaskProvider = ({ children }) => {
             status: t.status || 'todo',
             user_id: t.user_id || t.userId || '',
           };
-          console.log('Tâche normalisée (fetchTasks):', normalizedTask);
+        
           return normalizedTask;
         });
 
         const uniqueTasks = removeDuplicates(normalizedTasks);
         setTasks(uniqueTasks);
-        console.log('Tâches normalisées (fetchTasks):', uniqueTasks);
       } catch (error) {
         const errorMessage = error.response?.data?.error || error.message || 'Erreur lors du chargement des tâches';
         setError(errorMessage);
@@ -97,7 +93,6 @@ export const TaskProvider = ({ children }) => {
   }, []);
 
   const addTask = async (taskData) => {
-    console.log('addTask appelé avec:', taskData);
 
     const isDuplicate = tasks.some(
       (t) =>
