@@ -1,11 +1,10 @@
 import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { getToken } from '../services/authService';
 import { toast } from 'react-toastify';
+import { createTask, updateTask } from '../services/Taskservice'; // Import corrigé
 
-const TaskForm = ({ onSubmit, onCancel, initialData, setTasks }) => {
+const TaskForm = ({ onSubmit, onCancel, initialData }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -14,84 +13,101 @@ const TaskForm = ({ onSubmit, onCancel, initialData, setTasks }) => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Normaliser la date en format YYYY-MM-DD pour EAT
+  const normalizeDate = (dateStr) => {
+    if (!dateStr) {
+      console.log('Aucune date fournie pour normalisation');
+      return '';
+    }
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        console.warn(`Date invalide dans normalizeDate : ${dateStr}`);
+        return '';
+      }
+      const eatDate = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+      return eatDate.toISOString().substring(0, 10);
+    } catch (err) {
+      console.warn(`Erreur lors de la normalisation de la date : ${dateStr}`, err);
+      return '';
+    }
+  };
+
   useEffect(() => {
     if (initialData) {
+      console.log('initialData chargé:', initialData);
       setTitle(initialData.title || '');
       setDescription(initialData.description || '');
       setPriority(initialData.priority || 'medium');
       setStatus(initialData.status || 'todo');
-      if (initialData.dueDate) {
-        setDueDate(initialData.dueDate.substring(0, 10));
-      }
+      setDueDate(normalizeDate(initialData.due_date || initialData.dueDate));
+      console.log('dueDate initiale après normalisation:', normalizeDate(initialData.due_date || initialData.dueDate));
     }
   }, [initialData]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError(null);
+    event.stopPropagation();
 
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    const token = getToken();
-    if (!token || token.split('.').length !== 3) {
-      setError('Token invalide ou manquant.');
-      setIsSubmitting(false);
+    if (isSubmitting) {
+      console.log('Soumission bloquée : déjà en cours');
       return;
     }
 
+    setIsSubmitting(true);
+    setError(null);
+
     try {
+      const token = localStorage.getItem('token'); // Récupérer le token directement
+      if (!token || token.split('.').length !== 3) {
+        setError('Token invalide ou manquant.');
+        setIsSubmitting(false);
+        toast.error('Token invalide ou manquant.');
+        return;
+      }
+
       const decodedToken = jwtDecode(token);
       const user_id = decodedToken.id || decodedToken.user_id;
 
       if (!user_id) {
         setError("ID utilisateur non trouvé dans le token.");
         setIsSubmitting(false);
+        toast.error("ID utilisateur non trouvé.");
+        return;
+      }
+
+      if (!title.trim()) {
+        setError('Le titre est requis.');
+        setIsSubmitting(false);
+        toast.error('Le titre est requis.');
         return;
       }
 
       const taskData = {
         user_id,
-        title,
-        description,
-        priority,
-        status,
-        due_date: dueDate,
+        title: title.trim(),
+        description: description.trim() || '',
+        priority: priority || 'medium',
+        status: status || 'todo',
+        due_date: dueDate || null,
       };
 
-      let response;
-      const taskId = initialData?._id || initialData?.id;
+      console.log('Données envoyées:', taskData);
 
-      if (taskId) {
-        response = await axios.put(`http://localhost:3001/api/tasks/${taskId}`, taskData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        toast.success('Tâche mise à jour avec succès ✅');
+      // Appeler createTask ou updateTask selon initialData
+      if (initialData && initialData.id) {
+        await updateTask(initialData.id, taskData);
       } else {
-        response = await axios.post('http://localhost:3001/api/tasks', taskData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        toast.success('Tâche enregistrée avec succès ✅');
+        await createTask(taskData);
       }
 
-      // Mise à jour de la liste sans rechargement
-      if (setTasks) {
-        setTasks((prevTasks) => {
-          if (taskId) {
-            return prevTasks.map((task) =>
-              task._id === response.data._id || task.id === response.data.id ? response.data : task
-            );
-          } else {
-            return [response.data, ...prevTasks];
-          }
-        });
-      }
-
-      if (onSubmit) onSubmit(response.data);
+      toast.success(initialData ? 'Tâche mise à jour avec succès ✅' : 'Tâche enregistrée avec succès ✅');
+      await onSubmit(taskData); // Appeler onSubmit pour mettre à jour l'état
       if (onCancel) onCancel();
     } catch (error) {
-      console.error('Erreur lors de l\'enregistrement :', error.message || error);
-      toast.error("Une erreur est survenue lors de l'enregistrement de la tâche.");
+      console.error('Erreur lors de la soumission:', error.response?.data || error.message);
+      setError(error.response?.data?.error || 'Erreur lors de l’enregistrement de la tâche.');
+      toast.error('Erreur lors de l’enregistrement de la tâche.');
     } finally {
       setIsSubmitting(false);
     }
@@ -200,7 +216,9 @@ const TaskForm = ({ onSubmit, onCancel, initialData, setTasks }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+              }`}
             >
               {isSubmitting ? 'Enregistrement...' : initialData ? 'Mettre à jour' : 'Créer'}
             </button>

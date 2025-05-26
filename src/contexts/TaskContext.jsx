@@ -1,126 +1,211 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { getTasks, createTask, updateTask, deleteTask } from '../services/Taskservice'; // Import corrigé
 
-const TaskContext = createContext(undefined);
+const TaskContext = createContext();
 
-export const useTasks = () => {
-  const context = useContext(TaskContext);
-  if (!context) {
-    throw new Error('useTasks doit être utilisé à l’intérieur d’un TaskProvider');
-  }
-  return context;
-};
+export const useTasks = () => useContext(TaskContext);
 
 export const TaskProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  const generateUUID = () => crypto.randomUUID();
 
-  const fetchTasks = async () => {
+  const removeDuplicates = (tasks) => {
+    const seen = new Map();
+    return tasks.filter((t) => {
+      const key = `${t.title.toLowerCase()}|${t.due_date || ''}|${t.user_id || ''}`;
+      if (seen.has(key)) {
+        console.warn(`Tâche dupliquée ignorée : ${t.title} (ID: ${t.id})`);
+        return false;
+      }
+      seen.set(key, true);
+      return true;
+    });
+  };
+
+  const getTasksByStatus = (status) => {
+    return tasks.filter((t) => t.status === status);
+  };
+
+  const normalizeDate = (dateStr) => {
+    if (!dateStr) {
+      console.warn('Date absente');
+      return null;
+    }
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/tasks', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Erreur lors du chargement des tâches');
-      const data = await response.json();
-      const mapped = data.map(task => ({
-        ...task,
-        dueDate: task.due_date
-      }));
-      setTasks(mapped);
-    } catch (error) {
-      console.error('Erreur fetchTasks:', error.message);
-    } finally {
-      setLoading(false);
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        console.warn(`Date invalide détectée : ${dateStr}`);
+        return null;
+      }
+      const eatDate = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+      return eatDate.toISOString().substring(0, 10);
+    } catch (err) {
+      console.error(`Erreur lors de la normalisation de la date : ${dateStr}`, err);
+      return null;
     }
   };
 
+  useEffect(() => {
+    const fetchTasks = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await getTasks();
+        console.log('Réponse API brute (fetchTasks):', response.data);
+
+        let allTasks = [];
+        if (response.data.dueTasks && response.data.completedTasks) {
+          allTasks = [...response.data.dueTasks, ...response.data.completedTasks];
+        } else if (Array.isArray(response.data.tasks)) {
+          allTasks = response.data.tasks;
+        } else if (Array.isArray(response.data)) {
+          allTasks = response.data;
+        } else {
+          throw new Error('Structure de réponse API inattendue');
+        }
+
+        const normalizedTasks = allTasks.map((t) => {
+          const normalizedTask = {
+            ...t,
+            id: t.id || t._id || generateUUID(),
+            dueDate: normalizeDate(t.due_date || t.dueDate),
+            due_date: normalizeDate(t.due_date || t.dueDate),
+            status: t.status || 'todo',
+            user_id: t.user_id || t.userId || '',
+          };
+          console.log('Tâche normalisée (fetchTasks):', normalizedTask);
+          return normalizedTask;
+        });
+
+        const uniqueTasks = removeDuplicates(normalizedTasks);
+        setTasks(uniqueTasks);
+        console.log('Tâches normalisées (fetchTasks):', uniqueTasks);
+      } catch (error) {
+        const errorMessage = error.response?.data?.error || error.message || 'Erreur lors du chargement des tâches';
+        setError(errorMessage);
+        console.error('Erreur lors du chargement des tâches:', error);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
+
   const addTask = async (taskData) => {
+    console.log('addTask appelé avec:', taskData);
+
+    const isDuplicate = tasks.some(
+      (t) =>
+        t.title.toLowerCase() === taskData.title.toLowerCase() &&
+        (t.due_date || '') === (taskData.due_date || '') &&
+        t.user_id === taskData.user_id
+    );
+    if (isDuplicate) {
+      console.warn('Tâche dupliquée détectée:', taskData);
+      toast.warn('Une tâche avec ce titre et cette date existe déjà.');
+      return false;
+    }
+
+    const newTask = {
+      ...taskData,
+      id: generateUUID(),
+      createdAt: new Date().toISOString(),
+    };
+
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/tasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(taskData)
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de l’ajout de la tâche');
-      await response.json();
-
-      // Attendre un court instant avant de rafraîchir
-      setTimeout(() => {
-        fetchTasks(); // Recharger les tâches à jour
-      }, 1000); // 1 seconde
+      const response = await createTask(newTask);
+      console.log('Réponse ajout tâche:', response.data);
+      const savedTask = response.data.task
+        ? {
+            ...response.data.task,
+            id: response.data.task.id || response.data.task._id || newTask.id,
+            dueDate: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
+            due_date: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
+            status: response.data.task.status || 'todo',
+            user_id: response.data.task.user_id || newTask.user_id,
+          }
+        : {
+            ...response.data,
+            id: response.data.id || response.data._id || newTask.id,
+            dueDate: normalizeDate(response.data.due_date || response.data.dueDate),
+            due_date: normalizeDate(response.data.due_date || response.data.dueDate),
+            status: response.data.status || 'todo',
+            user_id: response.data.user_id || newTask.user_id,
+          };
+      setTasks((prevTasks) => removeDuplicates([...prevTasks, savedTask]));
+      console.log('Tâche ajoutée:', savedTask);
       return true;
     } catch (error) {
-      console.error('Erreur addTask:', error.message);
+      console.error('Erreur lors de l’ajout de la tâche:', error.response?.data || error);
+      setError(error.response?.data?.error || 'Erreur lors de l’ajout de la tâche');
+      toast.error(error.response?.data?.error || 'Erreur lors de l’ajout de la tâche');
       return false;
     }
   };
 
-  const updateTask = async (id, updates) => {
+  const updateTaskById = async (id, taskData) => {
+    console.log('updateTask appelé avec ID:', id, 'data:', taskData);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/tasks/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
-      const updated = await response.json();
-      const mapped = { ...updated, dueDate: updated.due_date };
-      setTasks(prev => prev.map(t => (t.id === id ? mapped : t)));
+      const response = await updateTask(id, taskData);
+      console.log('Réponse mise à jour tâche:', response.data);
+      const updatedTask = response.data.task
+        ? {
+            ...response.data.task,
+            id: response.data.task.id || response.data.task._id || id,
+            dueDate: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
+            due_date: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
+            status: response.data.task.status || 'todo',
+            user_id: response.data.task.user_id || taskData.user_id,
+          }
+        : {
+            ...response.data,
+            id: response.data.id || response.data._id || id,
+            dueDate: normalizeDate(response.data.due_date || response.data.dueDate),
+            due_date: normalizeDate(response.data.due_date || response.data.dueDate),
+            status: response.data.status || 'todo',
+            user_id: response.data.user_id || taskData.user_id,
+          };
+      setTasks((prevTasks) =>
+        removeDuplicates(prevTasks.map((t) => (t.id === id ? updatedTask : t)))
+      );
+      console.log('Tâche mise à jour:', updatedTask);
+      return true;
     } catch (error) {
-      console.error('Erreur updateTask:', error.message);
+      console.error('Erreur lors de la mise à jour de la tâche:', error.response?.data || error);
+      setError(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche.');
+      toast.error(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche.');
+      return false;
     }
   };
 
-  const deleteTask = async (id) => {
+  const deleteTaskById = async (id) => {
+    console.log('deleteTask appelé avec ID:', id);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/tasks/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de la suppression');
-      setTasks(prev => prev.filter(task => task.id !== id));
+      const response = await deleteTask(id);
+      console.log('Réponse suppression tâche:', response.data);
+      setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
+      toast.success('Tâche supprimée avec succès ✅');
+      return true;
     } catch (error) {
-      console.error('Erreur deleteTask:', error.message);
+      console.error('Erreur lors de la suppression de la tâche:', error.response?.data || error);
+      setError(error.response?.data?.error || 'Erreur lors de la suppression de la tâche.');
+      toast.error(error.response?.data?.error || 'Erreur lors de la suppression de la tâche.');
+      return false;
     }
   };
-
-  const getTasksByStatus = (status) => tasks.filter(task => task.status === status);
-
-  const getTaskById = (id) => tasks.find(task => task.id === id);
 
   return (
-    <TaskContext.Provider value={{
-      tasks,
-      loading,
-      addTask,
-      updateTask,
-      deleteTask,
-      getTasksByStatus,
-      getTaskById,
-      fetchTasks
-    }}>
+    <TaskContext.Provider
+      value={{ tasks, addTask, updateTask: updateTaskById, deleteTask: deleteTaskById, getTasksByStatus, loading, error }}
+    >
       {children}
     </TaskContext.Provider>
   );
 };
+
+export default TaskProvider;
