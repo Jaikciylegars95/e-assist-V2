@@ -54,6 +54,10 @@ const Sidebar = () => {
     });
   };
 
+  const handleAboutClick = () => {
+    navigate('AboutPage');
+  };
+
   return (
     <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
       {/* Logo */}
@@ -95,9 +99,8 @@ const Sidebar = () => {
           <span>Tâches</span>
         </NavLink>
 
-        {/* Bouton Calendrier modifié pour redirection */}
         <NavLink
-          to="/Calendar"
+          to="/calendar"
           className={({ isActive }) =>
             `flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
               isActive
@@ -127,7 +130,12 @@ const Sidebar = () => {
           <span>Paramètres</span>
         </NavLink>
 
-        <div className="flex items-center px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer">
+        <div
+          className="flex items-center px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer"
+          onClick={handleAboutClick}
+          role="button"
+          aria-label="Accéder à la page À propos"
+        >
           <HelpCircle size={20} className="mr-3" />
           <span>À propos</span>
         </div>
@@ -135,6 +143,8 @@ const Sidebar = () => {
         <div
           onClick={handleLogout}
           className="flex items-center px-4 py-3 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer mt-2"
+          role="button"
+          aria-label="Se déconnecter"
         >
           <LogOut size={20} className="mr-3" />
           <span>Déconnexion</span>

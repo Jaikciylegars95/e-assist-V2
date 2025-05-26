@@ -1,10 +1,21 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Moon, Sun, User, Bell, Shield, Globe } from 'lucide-react';
 
 const SettingsPage = () => {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   
+  // Exemple : Remplacez ceci par l'ID réel de l'utilisateur, par exemple, depuis un contexte d'authentification
+  const userId = 'votre_user_id'; // À remplacer par l'ID dynamique, par exemple, depuis un contexte ou une API
+
+  const handleEditProfile = () => {
+    navigate(`/profileSettings/${userId}`);
+  };
+  const handleEditPassword = () => {
+    navigate(`/PasswordSettings/${userId}`);
+  };
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Paramètre</h1>
@@ -45,7 +56,10 @@ const SettingsPage = () => {
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-gray-900 dark:text-white">Informations personnelles</p>
-                  <button className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+                  <button 
+                    onClick={handleEditProfile}
+                    className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                  >
                     Modifier
                   </button>
                 </div>
@@ -58,8 +72,10 @@ const SettingsPage = () => {
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-gray-900 dark:text-white">Mot de passe</p>
-                  <button className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
-                    Enregistrer
+                  
+                  <button onClick={handleEditPassword}
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+                    Modifier
                   </button>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Modifiez votre mot de passe et vos paramètres de sécurité.</p>

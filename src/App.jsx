@@ -12,6 +12,8 @@ import SignupForm from './components/signupForm'; // Importation correcte
 import Calendrier from './components/calendar';
 import TaskDetailPage from "./pages/TaskDetailPage";
 import ProfileSettings from "./pages/ProfileSettings";
+import PasswordSettings from "./pages/PasswordSettings";
+import AboutPage from "./pages/aboutPage";
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -48,7 +50,9 @@ function App() {
               <Route path="tasks" element={<TasksPage />} />
               <Route path="task-form" element={<TaskForm />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="ProfileSettings" element={<ProfileSettings />} />
+              <Route path="/Profilesettings/:id" element={<ProfileSettings />} />
+              <Route path="/PasswordSettings/:id" element={<PasswordSettings />} />
+              <Route path="/aboutPage" element={<AboutPage />} />
               <Route path="tasks/:id" element={<TaskDetailPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
