@@ -38,9 +38,9 @@ const Header = () => {
   const navigate = useNavigate();
 
   const priorityLabels = {
-    low: 'Basse',
-    medium: 'Moyenne',
-    high: 'Haute'
+    low: 'faible',
+    medium: 'modéré',
+    high: 'Ultra'
   };
 
   const statusLabels = {
@@ -614,9 +614,9 @@ const Header = () => {
                       onChange={(e) => setPriorityFilter(e.target.value)}
                     >
                       <option value="">Toutes</option>
-                      <option value="low">Basse</option>
-                      <option value="medium">Moyenne</option>
-                      <option value="high">Haute</option>
+                      <option value="low">Faible</option>
+                      <option value="medium">Modéré</option>
+                      <option value="high">Ultra</option>
                     </select>
                   </div>
                   <div>
