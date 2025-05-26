@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { getTasks, createTask, updateTask, deleteTask } from '../services/Taskservice'; // Import corrigé
+import { getTasks, createTask, updateTask, deleteTask } from '../services/Taskservice';
 
 const TaskContext = createContext();
 
@@ -14,13 +14,20 @@ export const TaskProvider = ({ children }) => {
   const generateUUID = () => crypto.randomUUID();
 
   const removeDuplicates = (tasks) => {
-    const seen = new Map();
+    const seenIds = new Set();
+    const seenKeys = new Map();
     return tasks.filter((t) => {
-      const key = `${t.title.toLowerCase()}|${t.due_date || ''}|${t.user_id || ''}`;
-      if (seen.has(key)) {
+      if (seenIds.has(t.id)) {
+        console.warn('Tâche avec ID dupliqué ignorée:', t);
         return false;
       }
-      seen.set(key, true);
+      seenIds.add(t.id);
+      const key = `${t.title.toLowerCase()}|${t.due_date || ''}|${t.user_id || ''}`;
+      if (seenKeys.has(key)) {
+        console.warn('Tâche avec clé dupliquée ignorée:', t);
+        return false;
+      }
+      seenKeys.set(key, true);
       return true;
     });
   };
@@ -30,9 +37,7 @@ export const TaskProvider = ({ children }) => {
   };
 
   const normalizeDate = (dateStr) => {
-    if (!dateStr) {
-      return null;
-    }
+    if (!dateStr) return null;
     try {
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) {
@@ -53,6 +58,7 @@ export const TaskProvider = ({ children }) => {
       setError(null);
       try {
         const response = await getTasks();
+        console.log('Réponse getTasks:', response.data);
 
         let allTasks = [];
         if (response.data.dueTasks && response.data.completedTasks) {
@@ -65,21 +71,18 @@ export const TaskProvider = ({ children }) => {
           throw new Error('Structure de réponse API inattendue');
         }
 
-        const normalizedTasks = allTasks.map((t) => {
-          const normalizedTask = {
-            ...t,
-            id: t.id || t._id || generateUUID(),
-            dueDate: normalizeDate(t.due_date || t.dueDate),
-            due_date: normalizeDate(t.due_date || t.dueDate),
-            status: t.status || 'todo',
-            user_id: t.user_id || t.userId || '',
-          };
-        
-          return normalizedTask;
-        });
+        const normalizedTasks = allTasks.map((t) => ({
+          ...t,
+          id: t.id || t._id || generateUUID(),
+          dueDate: normalizeDate(t.due_date || t.dueDate),
+          due_date: normalizeDate(t.due_date || t.dueDate),
+          status: t.status || 'todo',
+          user_id: t.user_id || t.userId || '',
+        }));
 
         const uniqueTasks = removeDuplicates(normalizedTasks);
         setTasks(uniqueTasks);
+        console.log('Tâches normalisées et dédupliquées:', uniqueTasks);
       } catch (error) {
         const errorMessage = error.response?.data?.error || error.message || 'Erreur lors du chargement des tâches';
         setError(errorMessage);
@@ -93,7 +96,6 @@ export const TaskProvider = ({ children }) => {
   }, []);
 
   const addTask = async (taskData) => {
-
     const isDuplicate = tasks.some(
       (t) =>
         t.title.toLowerCase() === taskData.title.toLowerCase() &&
@@ -134,6 +136,7 @@ export const TaskProvider = ({ children }) => {
           };
       setTasks((prevTasks) => removeDuplicates([...prevTasks, savedTask]));
       console.log('Tâche ajoutée:', savedTask);
+      toast.success('Tâche ajoutée avec succès');
       return true;
     } catch (error) {
       console.error('Erreur lors de l’ajout de la tâche:', error.response?.data || error);
@@ -144,14 +147,20 @@ export const TaskProvider = ({ children }) => {
   };
 
   const updateTaskById = async (id, taskData) => {
-    console.log('updateTask appelé avec ID:', id, 'data:', taskData);
+    console.log('updateTaskById appelé avec ID:', id, 'data:', taskData);
     try {
-      const response = await updateTask(id, taskData);
+      const normalizedTaskData = {
+        ...taskData,
+        due_date: normalizeDate(taskData.dueDate || taskData.due_date),
+      };
+      delete normalizedTaskData.dueDate;
+      const response = await updateTask(id, normalizedTaskData);
       console.log('Réponse mise à jour tâche:', response.data);
+      
       const updatedTask = response.data.task
         ? {
             ...response.data.task,
-            id: response.data.task.id || response.data.task._id || id,
+            id: id, // Forcer l'ID à rester le même
             dueDate: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
             due_date: normalizeDate(response.data.task.due_date || response.data.task.dueDate),
             status: response.data.task.status || 'todo',
@@ -159,37 +168,41 @@ export const TaskProvider = ({ children }) => {
           }
         : {
             ...response.data,
-            id: response.data.id || response.data._id || id,
+            id: id, // Forcer l'ID à rester le même
             dueDate: normalizeDate(response.data.due_date || response.data.dueDate),
             due_date: normalizeDate(response.data.due_date || response.data.dueDate),
             status: response.data.status || 'todo',
             user_id: response.data.user_id || taskData.user_id,
           };
-      setTasks((prevTasks) =>
-        removeDuplicates(prevTasks.map((t) => (t.id === id ? updatedTask : t)))
-      );
-      console.log('Tâche mise à jour:', updatedTask);
+
+      setTasks((prevTasks) => {
+        const newTasks = prevTasks.map((t) => (t.id === id ? updatedTask : t));
+        const uniqueTasks = removeDuplicates(newTasks);
+        console.log('Tâches après mise à jour:', uniqueTasks);
+        return uniqueTasks;
+      });
+      toast.success('Tâche mise à jour avec succès');
       return true;
     } catch (error) {
       console.error('Erreur lors de la mise à jour de la tâche:', error.response?.data || error);
-      setError(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche.');
-      toast.error(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche.');
+      setError(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche');
+      toast.error(error.response?.data?.error || 'Erreur lors de la mise à jour de la tâche');
       return false;
     }
   };
 
   const deleteTaskById = async (id) => {
-    console.log('deleteTask appelé avec ID:', id);
+    console.log('deleteTaskById appelé avec ID:', id);
     try {
       const response = await deleteTask(id);
       console.log('Réponse suppression tâche:', response.data);
       setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
-      toast.success('Tâche supprimée avec succès ✅');
+      toast.success('Tâche supprimée avec succès');
       return true;
     } catch (error) {
       console.error('Erreur lors de la suppression de la tâche:', error.response?.data || error);
-      setError(error.response?.data?.error || 'Erreur lors de la suppression de la tâche.');
-      toast.error(error.response?.data?.error || 'Erreur lors de la suppression de la tâche.');
+      setError(error.response?.data?.error || 'Erreur lors de la suppression de la tâche');
+      toast.error(error.response?.data?.error || 'Erreur lors de la suppression de la tâche');
       return false;
     }
   };
