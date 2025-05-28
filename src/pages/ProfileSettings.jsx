@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 const ProfileSettings = () => {
   const [userData, setUserData] = useState({
     email: '',
-    profilePicture: 'https://via.placeholder.com/150', // URL corrigée
+    profilePicture: 'https://placehold.co/150x150',
     dateNaissance: '',
     dateEmbauche: '',
   });
@@ -30,6 +30,8 @@ const ProfileSettings = () => {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userId = payload.id;
+        if (!userId) throw new Error('ID utilisateur non trouvé dans le token');
+
         const response = await fetch(`http://localhost:3001/api/users/${userId}`, {
           method: 'GET',
           headers: {
@@ -42,17 +44,17 @@ const ProfileSettings = () => {
         if (response.ok) {
           setUserData({
             email: data.email || '',
-            profilePicture: data.profilePicture || 'https://via.placeholder.com/150',
+            profilePicture: data.profilePicture || 'https://placehold.co/150x150',
             dateNaissance: data.dateNaissance ? new Date(data.dateNaissance).toISOString().split('T')[0] : '',
             dateEmbauche: data.dateEmbauche ? new Date(data.dateEmbauche).toISOString().split('T')[0] : '',
           });
-          setPreviewPicture(data.profilePicture || 'https://via.placeholder.com/150');
+          setPreviewPicture(data.profilePicture || 'https://placehold.co/150x150');
         } else {
-          throw new Error(data.error || 'Erreur lors de la récupération des données');
+          throw new Error(data.error || `Erreur ${response.status}: Impossible de récupérer les données`);
         }
       } catch (error) {
-        console.error('Erreur:', error);
-        toast.error('Erreur lors de la récupération des données', {
+        console.error('Erreur lors de la récupération des données:', error.message);
+        toast.error(error.message || 'Erreur lors de la récupération des données', {
           position: 'top-center',
           autoClose: 2000,
         });
@@ -64,7 +66,7 @@ const ProfileSettings = () => {
   const handlePictureChange = (e) => {
     const value = e.target.value;
     setUserData({ ...userData, profilePicture: value });
-    setPreviewPicture(value || 'https://via.placeholder.com/150');
+    setPreviewPicture(value || '');
   };
 
   const handleSubmit = async (e) => {
@@ -85,7 +87,9 @@ const ProfileSettings = () => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const userId = payload.id;
+      if (!userId) throw new Error('ID utilisateur non trouvé dans le token');
 
+      // Validation des données
       if (!userData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
         throw new Error('Email invalide');
       }
@@ -106,15 +110,18 @@ const ProfileSettings = () => {
           dateEmbauche: userData.dateEmbauche || null,
         }),
       });
-
+console.log('ty ny token',token);
+console.log('Payload du token:', payload);
       const data = await response.json();
+      console.log('Réponse du serveur:', { status: response.status, data });
+
       if (response.ok) {
         const isDark = document.documentElement.classList.contains('dark');
         await Swal.fire({
           title: 'Succès',
           text: 'Profil mis à jour avec succès',
           icon: 'success',
-          width: '90vw', // Ajusté pour responsivité
+          width: '90vw',
           background: isDark ? '#1f2937' : '#ffffff',
           color: isDark ? '#f3f4f6' : '#1f2937',
           confirmButtonText: 'OK',
@@ -126,10 +133,10 @@ const ProfileSettings = () => {
         });
         navigate('/dashboard');
       } else {
-        throw new Error(data.error || 'Erreur lors de la mise à jour');
+        throw new Error(data.error || `Erreur ${response.status}: Impossible de mettre à jour le profil`);
       }
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors de la mise à jour:', error.message);
       toast.error(error.message || 'Erreur lors de la mise à jour du profil', {
         position: 'top-center',
         autoClose: 2000,
@@ -175,7 +182,7 @@ const ProfileSettings = () => {
                 src={previewPicture}
                 alt="Prévisualisation"
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border border-gray-300 dark:border-gray-600"
-                onError={(e) => (e.target.src = '/fallback-image.jpg')} // Image de secours
+                onError={(e) => (e.target.src = 'https://placehold.co/150x150')} // Image de secours
               />
             </div>
           </div>
