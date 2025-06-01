@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import EmojiPicker from 'emoji-picker-react';
 
 const Chat = () => {
   const [messages, setMessages] = useState([]);
@@ -11,7 +12,9 @@ const Chat = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserSelect, setShowUserSelect] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const navigate = useNavigate();
+  const textareaRef = useRef(null);
 
   const validateMessage = (message) => {
     return message?.id && message.sender_id && message.receiver_id && message.content;
@@ -33,17 +36,17 @@ const Chat = () => {
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket.IO connected');
+      console.log('Socket.IO connecté');
       newSocket.emit('join');
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('Socket.IO connection error:', error);
+      console.error('Erreur de connexion Socket.IO:', error);
       toast.error('Erreur de connexion au serveur', { position: 'top-center', autoClose: 2000 });
     });
 
     newSocket.on('receiveMessage', (message) => {
-      console.log('Received message:', message);
+      console.log('Message reçu:', message);
       if (validateMessage(message)) {
         setMessages((prev) => {
           if (prev.some((m) => String(m.id) === String(message.id))) {
@@ -55,12 +58,12 @@ const Chat = () => {
           ];
         });
       } else {
-        console.warn('Invalid message received:', message);
+        console.warn('Message invalide reçu:', message);
       }
     });
 
     newSocket.on('messageSent', (message) => {
-      console.log('Message sent:', message);
+      console.log('Message envoyé:', message);
       if (validateMessage(message)) {
         setMessages((prev) => {
           if (prev.some((m) => String(m.id) === String(message.id))) {
@@ -72,12 +75,12 @@ const Chat = () => {
           ];
         });
       } else {
-        console.warn('Invalid message sent:', message);
+        console.warn('Message invalide envoyé:', message);
       }
     });
 
     newSocket.on('error', (error) => {
-      console.error('Socket.IO error:', error);
+      console.error('Erreur Socket.IO:', error);
       const errorMessage = error.details ? `${error.message}: ${error.details}` : error.message || 'Erreur de connexion';
       toast.error(errorMessage, { position: 'top-center', autoClose: 3000 });
       setMessages((prev) => prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')));
@@ -108,9 +111,9 @@ const Chat = () => {
           throw new Error(data.message || `Erreur lors du chargement des messages: ${response.statusText}`);
         }
       } catch (error) {
-        console.error('Fetch messages error:', error);
+        console.error('Erreur fetch messages:', error);
         const errorMessage = error.message.includes('404')
-          ? 'Service de messagerie non disponible'
+          ? 'Service de messagerie indisponible'
           : error.message;
         toast.error(errorMessage, { position: 'top-center', autoClose: 3000 });
       } finally {
@@ -142,7 +145,7 @@ const Chat = () => {
           throw new Error(data.message || 'Erreur lors de la récupération des utilisateurs');
         }
       } catch (error) {
-        console.error('Fetch users error:', error);
+        console.error('Erreur fetch utilisateurs:', error);
         toast.error('Impossible de charger les utilisateurs', { position: 'top-center', autoClose: 2000 });
       }
     };
@@ -189,6 +192,22 @@ const Chat = () => {
     setMessages((prev) => [...prev, tempMessage]);
     socket.emit('sendMessage', { receiverId, content });
     setContent('');
+    setShowEmojiPicker(false);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    } else if (e.key === 'e' && e.ctrlKey) {
+      e.preventDefault();
+      setShowEmojiPicker(!showEmojiPicker);
+    }
+  };
+
+  const handleEmojiClick = (emojiObject) => {
+    setContent((prev) => prev + emojiObject.emoji);
+    textareaRef.current.focus();
   };
 
   const token = localStorage.getItem('token');
@@ -212,17 +231,17 @@ const Chat = () => {
     : [];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-800 max-w-full">
-      <div className="bg-green-600 dark:bg-green-800 text-white p-4 flex items-center justify-between shadow-md">
-        <h2 className="text-xl font-semibold">Messagerie</h2>
+    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 max-w-full font-sans">
+      <div className="bg-green-600 dark:bg-green-800 text-white p-3 flex items-center justify-between shadow-lg">
+        <h2 className="text-lg font-semibold">Messagerie</h2>
         <button
           onClick={() => setShowUserSelect(true)}
-          className="bg-green-700 dark:bg-green-900 text-white p-2 rounded-full hover:bg-green-800 dark:hover:bg-green-950 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
-          aria-label="Nouvelle discussion"
+          className="bg-green-700 dark:bg-green-900 text-white p-2 rounded-full hover:bg-green-800 dark:hover:bg-green-950 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+          aria-label="Nouvelle conversation"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
+            className="h-5 w-5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -233,61 +252,60 @@ const Chat = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-400">
+        <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-300 animate-pulse">
           Chargement...
         </div>
       ) : showUserSelect ? (
-        <div className="flex-1 p-4 flex flex-col items-center justify-center min-h-0">
-          <label htmlFor="userSelect" className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">
-            Nouvelle discussion
-          </label>
-          <select
-            id="userSelect"
-            value={selectedUser || ''}
-            onChange={(e) => {
-              setSelectedUser(e.target.value);
-              setShowUserSelect(false);
-            }}
-            className="border border-gray-300 dark:border-gray-600 rounded-lg p-2 w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
-            aria-label="Sélectionner un utilisateur"
-          >
-            <option value="">Sélectionner un utilisateur</option>
+        <div className="flex-1 p-6 overflow-y-auto min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow-md m-4">
+          <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Sélectionner un utilisateur</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(users)
               .filter(([id]) => parseInt(id) !== currentUserId)
               .map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
+                <button
+                  key={id}
+                  onClick={() => {
+                    setSelectedUser(id);
+                    setShowUserSelect(false);
+                  }}
+                  className="flex items-center p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-200"
+                >
+                  <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white font-semibold mr-3">
+                    {name[0]}
+                  </div>
+                  <span className="text-gray-800 dark:text-white font-medium">{name}</span>
+                </button>
               ))}
-          </select>
+          </div>
           <button
             onClick={() => setShowUserSelect(false)}
-            className="mt-4 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+            className="mt-6 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold"
             aria-label="Annuler"
           >
             Annuler
           </button>
         </div>
       ) : !selectedUser ? (
-        <div className="flex-1 p-4 overflow-y-auto min-h-0">
+        <div className="flex-1 p-6 overflow-y-auto min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow-md m-4">
           {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-400">
-              <p>Aucune discussion pour le moment</p>
-              <p>Sélectionnez un utilisateur pour commencer à discuter</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-300">
+              <p className="text-lg mb-2">Aucune conversation pour le moment</p>
+              <p className="mb-4">Sélectionnez un utilisateur pour commencer à discuter</p>
               <button
                 onClick={() => setShowUserSelect(true)}
-                className="mt-4 bg-green-600 dark:bg-green-800 text-white p-2 rounded-full hover:bg-green-700 dark:hover:bg-green-900"
-                aria-label="Nouvelle discussion"
+                className="bg-green-600 dark:bg-green-800 text-white px-4 py-2 rounded-full hover:bg-green-700 dark:hover:bg-green-900 transition duration-200"
+                aria-label="Nouvelle conversation"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
+                  className="h-5 w-5 inline-block mr-2"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
+                Nouvelle conversation
               </button>
             </div>
           ) : (
@@ -295,9 +313,9 @@ const Chat = () => {
               <div
                 key={conv.userId}
                 onClick={() => setSelectedUser(conv.userId.toString())}
-                className="flex items-center p-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+                className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded-lg transition duration-200"
               >
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-white font-semibold mr-3">
+                <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white font-semibold mr-3">
                   {users[conv.userId]?.[0] || 'U'}
                 </div>
                 <div className="flex-1">
@@ -315,15 +333,15 @@ const Chat = () => {
         </div>
       ) : (
         <>
-          <div className="bg-green-600 dark:bg-green-800 text-white p-4 flex items-center justify-between shadow-md">
+          <div className="bg-green-600 dark:bg-green-800 text-white p-2 flex items-center justify-between shadow-md">
             <button
               onClick={() => setSelectedUser(null)}
-              className="text-white p-2"
+              className="text-white p-2 hover:bg-green-700 rounded-full transition duration-200"
               aria-label="Retour"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
+                className="h-5 w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -331,33 +349,31 @@ const Chat = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 className="text-xl font-semibold">{users[selectedUser]}</h2>
+            <h2 className="text-lg font-semibold truncate">{users[selectedUser]}</h2>
             <div className="w-6"></div>
           </div>
-          <div className="flex-1 p-4 overflow-y-auto min-h-0 bg-gray-100 dark:bg-gray-800">
+          <div className="flex-1 p-6 overflow-y-auto min-h-0 bg-white dark:bg-gray-800 rounded-lg shadow-md m-4">
             {filteredMessages.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-400">
+              <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-300">
                 Aucun message pour le moment. Envoyez un message pour commencer la discussion !
               </div>
             ) : (
               filteredMessages.map((msg) => (
                 <div
                   key={String(msg.id)}
-                  className={`flex mb-2 ${
-                    msg.sender_id === currentUserId ? 'justify-end' : 'justify-start'
-                  }`}
+                  className={`flex mb-4 ${msg.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className="flex items-start space-x-2">
+                  <div className="flex items-start space-x-3">
                     {msg.sender_id !== currentUserId && (
-                      <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white font-semibold">
                         {users[msg.sender_id]?.[0] || 'U'}
                       </div>
                     )}
                     <div
-                      className={`max-w-xs md:max-w-md p-3 rounded-lg shadow-md ${
+                      className={`max-w-xs md:max-w-md p-4 rounded-2xl shadow-lg ${
                         msg.sender_id === currentUserId
-                          ? 'bg-green-200 dark:bg-green-700 text-gray-800 dark:text-white'
-                          : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-white'
+                          ? 'bg-green-100 dark:bg-green-700 text-gray-800 dark:text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'
                       }`}
                     >
                       <div className="text-sm">
@@ -373,23 +389,49 @@ const Chat = () => {
               ))
             )}
           </div>
-          <div className="bg-white dark:bg-gray-900 p-4 flex items-center border-t border-gray-300 dark:border-gray-700">
-            <input
-              type="text"
-              placeholder="Votre message..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 rounded-lg p-2 flex-1 mr-2 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
-              aria-label="Écrire un message"
-            />
+          <div className="bg-white dark:bg-gray-900 p-4 flex items-center border-t border-gray-200 dark:border-gray-700 shadow-inner">
+            {showEmojiPicker && (
+              <div className="absolute bottom-20 left-4 z-10">
+                <EmojiPicker onEmojiClick={handleEmojiClick} />
+              </div>
+            )}
             <button
-              onClick={handleSend}
-              className="bg-green-600 dark:bg-green-800 text-white p-2 rounded-full hover:bg-green-700 dark:hover:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
-              aria-label="Envoyer le message"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="text-gray-600 dark:text-gray-300 p-2 hover:text-green-600 dark:hover:text-green-400 rounded-full transition duration-200"
+              aria-label="Afficher/masquer le sélecteur d'émojis"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+            <textarea
+              ref={textareaRef}
+              placeholder="Votre message..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={handleKeyPress}
+              className="border border-gray-200 dark:border-gray-600 rounded-lg p-3 flex-1 mr-2 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white resize-none h-12"
+              aria-label="Écrire un message"
+            />
+            <button
+              onClick={handleSend}
+              className="bg-green-600 dark:bg-green-800 text-white p-3 rounded-full hover:bg-green-700 dark:hover:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 transition duration-200"
+              aria-label="Envoyer le message"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
