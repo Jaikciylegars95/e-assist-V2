@@ -14,7 +14,7 @@ import TaskDetailPage from "./pages/TaskDetailPage";
 import ProfileSettings from "./pages/ProfileSettings";
 import PasswordSettings from "./pages/PasswordSettings";
 import AboutPage from "./pages/aboutPage";
-
+import Chat from "./components/chat";
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
@@ -48,6 +48,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="calendar" element={<Calendrier />} />
               <Route path="tasks" element={<TasksPage />} />
+              <Route path="chat" element={<Chat />} />
               <Route path="task-form" element={<TaskForm />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="/Profilesettings/:id" element={<ProfileSettings />} />

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   CheckSquare,
   Calendar,
+  MessageSquare,
   Settings,
   HelpCircle,
   LogOut
@@ -111,6 +112,20 @@ const Sidebar = () => {
         >
           <Calendar size={20} className="mr-3" />
           <span>Calendrier</span>
+        </NavLink>
+
+        <NavLink
+          to="/chat"
+          className={({ isActive }) =>
+            `flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
+              isActive
+                ? 'bg-primary-50 dark:bg-gray-700 text-primary-700 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`
+          }
+        >
+          <MessageSquare size={20} className="mr-3" />
+          <span>Messagerie</span>
         </NavLink>
       </nav>
 
