@@ -13,4 +13,8 @@ export default defineConfig({
       },
     },
   },
+  cacheDir: './node_modules/.vite_e_assist_frontend', // Unique cache
+  optimizeDeps: {
+    exclude: ['jspdf', 'core-js'], // Exclude problematic deps
+  }, 
 });

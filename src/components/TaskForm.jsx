@@ -2,7 +2,7 @@ import { jwtDecode } from 'jwt-decode';
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { createTask, updateTask } from '../services/Taskservice'; // Import corrigé
+import { createTask, updateTask, getTasks } from '../services/Taskservice';
 
 const TaskForm = ({ onSubmit, onCancel, initialData }) => {
   const [title, setTitle] = useState('');
@@ -13,7 +13,7 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Normaliser la date en format YYYY-MM-DD pour EAT
+  // Normaliser la date en format YYYY-MM-DD
   const normalizeDate = (dateStr) => {
     if (!dateStr) {
       console.log('Aucune date fournie pour normalisation');
@@ -25,8 +25,7 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
         console.warn(`Date invalide dans normalizeDate : ${dateStr}`);
         return '';
       }
-      const eatDate = new Date(date.getTime() + 3 * 60 * 60 * 1000);
-      return eatDate.toISOString().substring(0, 10);
+      return date.toISOString().substring(0, 10);
     } catch (err) {
       console.warn(`Erreur lors de la normalisation de la date : ${dateStr}`, err);
       return '';
@@ -45,6 +44,38 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
     }
   }, [initialData]);
 
+  // Validation du titre pour éviter les doublons
+  const validateTitle = async (title) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token manquant pour validation du titre');
+        return true; // Continuer si pas de token (sera géré par l'API)
+      }
+      const decoded = jwtDecode(token);
+      const userId = decoded.id;
+      const tasks = await getTasks();
+      console.log('Tâches récupérées pour validation:', tasks);
+      const normalizedTitle = title.trim().toLowerCase();
+      const titleExists = tasks.some(
+        (task) =>
+          task.title &&
+          task.title.trim().toLowerCase() === normalizedTitle &&
+          task.user_id == userId &&
+          (!initialData || task.id !== initialData.id)
+      );
+      console.log('Validation du titre:', {
+        title: normalizedTitle,
+        userId,
+        titleExists,
+      });
+      return !titleExists;
+    } catch (err) {
+      console.error('Erreur lors de la validation du titre:', err);
+      return true; // Continuer en cas d'erreur
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -58,23 +89,14 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token'); // Récupérer le token directement
+      const token = localStorage.getItem('token');
       if (!token || token.split('.').length !== 3) {
         setError('Token invalide ou manquant.');
         setIsSubmitting(false);
         toast.error('Token invalide ou manquant.');
         return;
       }
-
-      const decodedToken = jwtDecode(token);
-      const user_id = decodedToken.id || decodedToken.user_id;
-
-      if (!user_id) {
-        setError("ID utilisateur non trouvé dans le token.");
-        setIsSubmitting(false);
-        toast.error("ID utilisateur non trouvé.");
-        return;
-      }
+      console.log('Token JWT décodé:', jwtDecode(token));
 
       if (!title.trim()) {
         setError('Le titre est requis.');
@@ -83,8 +105,16 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
         return;
       }
 
+      // Valider le titre pour éviter les doublons
+      const isTitleValid = await validateTitle(title);
+      if (!isTitleValid) {
+        setError('Une tâche avec ce titre existe déjà pour vous.');
+        setIsSubmitting(false);
+        toast.error('Une tâche avec ce titre existe déjà pour vous.');
+        return;
+      }
+
       const taskData = {
-        user_id,
         title: title.trim(),
         description: description.trim() || '',
         priority: priority || 'medium',
@@ -92,22 +122,24 @@ const TaskForm = ({ onSubmit, onCancel, initialData }) => {
         due_date: dueDate || null,
       };
 
-      console.log('Données envoyées:', taskData);
+      console.log('Données envoyées à l\'API:', taskData);
 
-      // Appeler createTask ou updateTask selon initialData
       if (initialData && initialData.id) {
         await updateTask(initialData.id, taskData);
+        toast.success('Tâche mise à jour avec succès ✅');
       } else {
         await createTask(taskData);
+        toast.success('Tâche enregistrée avec succès ✅');
       }
 
-      toast.success(initialData ? 'Tâche mise à jour avec succès ✅' : 'Tâche enregistrée avec succès ✅');
-      await onSubmit(taskData); // Appeler onSubmit pour mettre à jour l'état
+      await onSubmit(taskData);
       if (onCancel) onCancel();
     } catch (error) {
       console.error('Erreur lors de la soumission:', error.response?.data || error.message);
-      setError(error.response?.data?.error || 'Erreur lors de l’enregistrement de la tâche.');
-      toast.error('Erreur lors de l’enregistrement de la tâche.');
+      const errorMessage =
+        error.response?.data?.error || 'Erreur lors de l’enregistrement de la tâche.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

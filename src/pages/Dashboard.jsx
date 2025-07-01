@@ -213,7 +213,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tableau de bord</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {format(new Date(), 'EEEE, MMMM d, yyyy', { locale: fr })}
+            {format(new Date(), 'EEEE,d MMMM, yyyy', { locale: fr })}
           </p>
         </div>
         <button

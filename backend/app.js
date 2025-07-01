@@ -10,6 +10,7 @@ const taskRoutes = require('./routes/tasks');
 const usersRoutes = require('./routes/users');
 const notificationsRoutes = require('./routes/notifications');
 const messagesRoutes = require('./routes/messages');
+const TeamLeaderRoutes = require('./routes/TeamLeader');
 
 const app = express();
 const server = http.createServer(app);
@@ -115,6 +116,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/users', messagesRoutes);
+app.use('/api/TeamLeader', TeamLeaderRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Serveur backend fonctionne' });

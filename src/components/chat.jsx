@@ -13,6 +13,8 @@ const Chat = () => {
   const [showUserSelect, setShowUserSelect] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // New state to track unread messages count per user
+  const [unreadMessages, setUnreadMessages] = useState({});
   const navigate = useNavigate();
   const textareaRef = useRef(null);
 
@@ -48,15 +50,23 @@ const Chat = () => {
     newSocket.on('receiveMessage', (message) => {
       console.log('Message reçu:', message);
       if (validateMessage(message)) {
+        const isCurrentConversation = String(selectedUser) === String(message.sender_id);
         setMessages((prev) => {
           if (prev.some((m) => String(m.id) === String(message.id))) {
             return prev;
           }
           return [
             ...prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')),
-            { ...message, created_at: new Date(message.created_at) },
+            { ...message, created_at: new Date(message.created_at), unread: !isCurrentConversation },
           ];
         });
+        // Update unread messages count if not in the current conversation
+        if (!isCurrentConversation) {
+          setUnreadMessages((prev) => ({
+            ...prev,
+            [message.sender_id]: (prev[message.sender_id] || 0) + 1,
+          }));
+        }
       } else {
         console.warn('Message invalide reçu:', message);
       }
@@ -71,7 +81,7 @@ const Chat = () => {
           }
           return [
             ...prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')),
-            { ...message, created_at: new Date(message.created_at) },
+            { ...message, created_at: new Date(message.created_at), unread: false },
           ];
         });
       } else {
@@ -101,6 +111,7 @@ const Chat = () => {
             .map((msg) => ({
               ...msg,
               created_at: new Date(msg.created_at),
+              unread: false, // Assume fetched messages are read
             }));
           setMessages((prev) => {
             const existingIds = new Set(prev.map((m) => String(m.id)).filter((id) => id));
@@ -161,6 +172,24 @@ const Chat = () => {
     };
   }, [navigate]);
 
+  // Mark messages as read when selecting a user
+  useEffect(() => {
+    if (selectedUser) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          (msg.sender_id === parseInt(selectedUser) && msg.receiver_id === currentUserId) ||
+          (msg.receiver_id === parseInt(selectedUser) && msg.sender_id === currentUserId)
+            ? { ...msg, unread: false }
+            : msg
+        )
+      );
+      setUnreadMessages((prev) => ({
+        ...prev,
+        [selectedUser]: 0,
+      }));
+    }
+  }, [selectedUser]);
+
   const handleSend = () => {
     if (!content || !selectedUser) {
       toast.error('Destinataire et message requis', { position: 'top-center', autoClose: 2000 });
@@ -188,6 +217,7 @@ const Chat = () => {
       receiver_id: receiverId,
       content,
       created_at: new Date(),
+      unread: false,
     };
     setMessages((prev) => [...prev, tempMessage]);
     socket.emit('sendMessage', { receiverId, content });
@@ -230,10 +260,18 @@ const Chat = () => {
       )
     : [];
 
+  // Check if there are any unread messages
+  const hasUnreadMessages = Object.values(unreadMessages).some((count) => count > 0);
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 max-w-full font-sans">
       <div className="bg-green-600 dark:bg-green-800 text-white p-3 flex items-center justify-between shadow-lg">
-        <h2 className="text-lg font-semibold">Messagerie</h2>
+        <h2 className="text-lg font-semibold flex items-center">
+          Messagerie
+          {hasUnreadMessages && (
+            <span className="ml-2 w-2 h-2 bg-orange-500 rounded-full" aria-label="Nouveau message"></span>
+          )}
+        </h2>
         <button
           onClick={() => setShowUserSelect(true)}
           className="bg-green-700 dark:bg-green-900 text-white p-2 rounded-full hover:bg-green-800 dark:hover:bg-green-950 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
@@ -319,7 +357,12 @@ const Chat = () => {
                   {users[conv.userId]?.[0] || 'U'}
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-800 dark:text-white">{users[conv.userId]}</div>
+                  <div className="font-semibold text-gray-800 dark:text-white flex items-center">
+                    {users[conv.userId]}
+                    {(unreadMessages[conv.userId] || 0) > 0 && (
+                      <span className="ml-2 w-2 h-2 bg-orange-500 rounded-full" aria-label="Nouveau message"></span>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
                     {conv.lastMessage?.content || 'Aucun message'}
                   </div>
@@ -376,7 +419,7 @@ const Chat = () => {
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'
                       }`}
                     >
-                      <div className="text-sm">
+                      <div className={`text-sm ${msg.unread ? 'font-bold' : ''}`}>
                         <span className="font-bold">{users[msg.sender_id]}: </span>
                         {msg.content}
                       </div>

@@ -1,18 +1,17 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const mysql = require('mysql2/promise');  // Utiliser mysql2 avec promesses
-require('dotenv').config();  // Charger les variables d'environnement
+const mysql = require('mysql2/promise');
+require('dotenv').config();
 const router = express.Router();
+const { authMiddleware } = require('../middleware/authmiddleware');
 
-// Vérifier que la clé secrète JWT est définie
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('La clé secrète JWT est manquante dans le fichier .env');
-  process.exit(1); // Arrêter le serveur si la clé secrète n'est pas définie
+  process.exit(1);
 }
 
-// Connexion à la base de données avec mysql2 (promesses)
 const connection = mysql.createPool({
   host: 'localhost',
   user: 'root',
@@ -20,45 +19,54 @@ const connection = mysql.createPool({
   database: 'taskflow'
 });
 
-// Route de connexion
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, stayConnected } = req.body;
+  console.log('Requête login reçue:', { email, stayConnected });
+  if (!email || !password) {
+    console.error('Erreur: Email ou mot de passe manquant');
+    return res.status(400).json({ error: 'Email et mot de passe requis' });
+  }
 
   try {
-    // Vérifier si l'email existe dans la base de données
-    const [rows] = await connection.execute('SELECT * FROM users WHERE email = ?', [email]);
-
-    if (rows.length === 0) {
-      return res.status(401).json({ message: 'Identifiants incorrects' });
+    const [users] = await connection.execute('SELECT id, email, password, role, team_id FROM users WHERE email = ?', [email]);
+    console.log('Résultat de la requête users:', users);
+    if (!users.length) {
+      console.error('Erreur login: Identifiants incorrects pour', email);
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
-    const user = rows[0];
-
-    // Comparer le mot de passe avec le hachage stocké dans la base de données
+    const user = users[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Identifiants incorrects' });
+      console.error('Erreur login: Mot de passe incorrect pour', email);
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
-    // Générer un token JWT
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role, team_id: user.team_id },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: stayConnected ? '7d' : '2h' }
     );
+    console.log('Token généré:', { id: user.id, email: user.email, role: user.role, team_id: user.team_id, expiresIn: stayConnected ? '7d' : '2h' });
 
-    // Répondre avec le token et les informations de l'utilisateur
     res.json({
       token,
+      role: user.role,
+      team_id: user.team_id,
       user: {
         id: user.id,
         email: user.email
       }
     });
-  } catch (err) {
-    console.error('Erreur serveur :', err);
-    res.status(500).json({ message: 'Erreur serveur' });
+  } catch (error) {
+    console.error('Erreur login:', error.message);
+    res.status(500).json({ error: 'Erreur serveur lors de la connexion' });
   }
+});
+
+router.get('/verify', authMiddleware, (req, res) => {
+  console.log('Requête verify:', { role: req.user_role, userId: req.user_id, team_id: req.user_team_id });
+  res.json({ role: req.user_role, userId: req.user_id, team_id: req.user_team_id });
 });
 
 module.exports = router;
