@@ -2,7 +2,7 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const router = express.Router();
-const { authMiddleware, restrictToTeamLeader } = require('../middleware/authmiddleware');
+const { authMiddleware, restrictTo } = require('../middleware/authmiddleware');
 
 const connection = mysql.createPool({
   host: 'localhost',
@@ -102,12 +102,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/users - récupérer la liste des utilisateurs sans les mots de passe (réservé aux chefs d'équipe)
-router.get('/', authMiddleware, restrictToTeamLeader, async (req, res) => {
+// GET /api/users - récupérer tous les utilisateurs sauf l'utilisateur connecté
+router.get('/', authMiddleware, restrictTo('team_leader', 'user'), async (req, res) => {
   try {
-    const [users] = await connection.execute(
-      'SELECT id, email, nom, prenom, profilePicture FROM users WHERE role != "team_leader"'
-    );
+    const query = 'SELECT id, email, nom, prenom, profilePicture FROM users WHERE id != ?';
+    const params = [req.user_id];
+
+    const [users] = await connection.execute(query, params);
     console.log('Utilisateurs récupérés:', users);
     res.json(
       users.map((user) => ({

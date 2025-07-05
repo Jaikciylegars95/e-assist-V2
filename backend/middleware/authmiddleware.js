@@ -38,4 +38,15 @@ const restrictToTeamLeader = (req, res, next) => {
   next();
 };
 
-module.exports = { authMiddleware, restrictToTeamLeader };
+const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    console.log('Vérification restrictTo, rôle:', req.user_role, 'rôles autorisés:', roles);
+    if (!roles.includes(req.user_role)) {
+      console.error('Accès interdit: rôle non autorisé', { role: req.user_role, allowedRoles: roles });
+      return res.status(403).json({ error: 'Accès interdit' });
+    }
+    next();
+  };
+};
+
+module.exports = { authMiddleware, restrictToTeamLeader, restrictTo };
