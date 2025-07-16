@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Mail, User, Calendar, Briefcase, Users } from 'lucide-react';
 import axios from 'axios';
@@ -22,7 +22,22 @@ const SignupForm = () => {
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isEmailChecked, setIsEmailChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [teams, setTeams] = useState([]); // Liste des équipes disponibles
   const navigate = useNavigate();
+
+  // Récupérer les équipes disponibles au chargement du composant
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const response = await axios.get('http://localhost:3001/api/teams');
+        setTeams(response.data);
+      } catch (err) {
+        console.error('Erreur lors de la récupération des équipes:', err);
+        setError('Impossible de charger les équipes. Veuillez réessayer ou contacter le support.');
+      }
+    };
+    fetchTeams();
+  }, []);
 
   const checkEmailAvailability = async (email) => {
     if (!email) {
@@ -109,6 +124,14 @@ const SignupForm = () => {
       return;
     }
 
+    // Vérification que team_id existe dans la liste des équipes
+    const teamExists = teams.some((team) => team.id === parseInt(formData.team_id));
+    if (!teamExists) {
+      setError('L\'ID de l\'équipe est invalide ou n\'existe pas.');
+      setIsSubmitting(false);
+      return;
+    }
+
     // Vérification de l'email
     if (!isEmailChecked || emailError) {
       setError(emailError || 'Veuillez vérifier que l\'email est disponible avant de soumettre.');
@@ -151,7 +174,7 @@ const SignupForm = () => {
         message: err.message,
         response: err.response?.data,
         status: err.response?.status,
-      }); // Log détaillé pour débogage
+      });
       let errorMessage;
       if (err.response?.data?.message?.includes('ER_DUP_ENTRY') && err.response?.data?.message?.includes('users.PRIMARY')) {
         errorMessage = 'Erreur serveur : impossible de créer un nouvel utilisateur en raison d\'un problème d\'identifiant. Veuillez contacter l\'administrateur.';
@@ -216,7 +239,6 @@ const SignupForm = () => {
             { id: 'dateNaissance', label: 'Date de naissance', icon: <Calendar className="h-5 w-5 text-gray-400" />, type: 'date' },
             { id: 'poste', label: 'Poste', icon: <Briefcase className="h-5 w-5 text-gray-400" />, type: 'text' },
             { id: 'dateEmbauche', label: 'Date d\'embauche', icon: <Calendar className="h-5 w-5 text-gray-400" />, type: 'date' },
-            { id: 'team_id', label: 'ID de l\'équipe', icon: <Users className="h-5 w-5 text-gray-400" />, type: 'number' },
           ].map(({ id, label, icon, type, error }) => (
             <div key={id}>
               <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
@@ -239,7 +261,7 @@ const SignupForm = () => {
                   className={`block w-full ${icon ? 'pl-10' : 'pl-3'} pr-3 py-3 border ${
                     id === 'email' && emailError ? 'border-red-500' : 'border-gray-300'
                   } rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all`}
-                  placeholder={type !== 'date' && type !== 'number' ? `Entrez votre ${label.toLowerCase()}` : ''}
+                  placeholder={type !== 'date' ? `Entrez votre ${label.toLowerCase()}` : ''}
                   disabled={isSubmitting || (id === 'email' && isCheckingEmail)}
                 />
                 {id === 'email' && isCheckingEmail && (
@@ -251,6 +273,35 @@ const SignupForm = () => {
               </div>
             </div>
           ))}
+          <div>
+            <label htmlFor="team_id" className="block text-sm font-medium text-gray-700 mb-1">
+              Équipe
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Users className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                id="team_id"
+                name="team_id"
+                value={formData.team_id}
+                onChange={handleChange}
+                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                required
+                disabled={isSubmitting || teams.length === 0}
+              >
+                <option value="">Sélectionnez une équipe</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name || `Équipe ${team.id}`}
+                  </option>
+                ))}
+              </select>
+              {teams.length === 0 && (
+                <p className="mt-1 text-sm text-red-600">Aucune équipe disponible. Veuillez contacter l'administrateur.</p>
+              )}
+            </div>
+          </div>
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
               Rôle
@@ -273,11 +324,13 @@ const SignupForm = () => {
         <motion.button
           type="submit"
           className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-            isSubmitting || isCheckingEmail || !isEmailChecked ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            isSubmitting || isCheckingEmail || !isEmailChecked || teams.length === 0
+              ? 'bg-blue-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700'
           } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors`}
-          whileHover={{ scale: isSubmitting || isCheckingEmail || !isEmailChecked ? 1 : 1.02 }}
-          whileTap={{ scale: isSubmitting || isCheckingEmail || !isEmailChecked ? 1 : 0.98 }}
-          disabled={isSubmitting || isCheckingEmail || !isEmailChecked}
+          whileHover={{ scale: isSubmitting || isCheckingEmail || !isEmailChecked || teams.length === 0 ? 1 : 1.02 }}
+          whileTap={{ scale: isSubmitting || isCheckingEmail || !isEmailChecked || teams.length === 0 ? 1 : 0.98 }}
+          disabled={isSubmitting || isCheckingEmail || !isEmailChecked || teams.length === 0}
         >
           {isSubmitting ? 'Envoi en cours...' : 'S\'inscrire'}
         </motion.button>

@@ -20,7 +20,7 @@ const Chat = () => {
   const chatContainerRef = useRef(null);
 
   const validateMessage = (message) => {
-    return message?.id && message.sender_id && message.receiver_id && message.content;
+    return message?.sender_id && message?.receiver_id && message?.content;
   };
 
   useEffect(() => {
@@ -32,127 +32,27 @@ const Chat = () => {
     }
 
     const payload = JSON.parse(atob(token.split('.')[1]));
-    const currentUserId = payload.id;
+    const currentUserId = String(payload.id);
+    const currentUserName = payload.prenom && payload.nom
+      ? `${payload.prenom} ${payload.nom}`
+      : payload.email || `Utilisateur ${currentUserId}`;
+
+    setUsers({ [currentUserId]: currentUserName });
 
     const newSocket = io('http://localhost:3001', {
       auth: { token: `Bearer ${token}` },
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket.IO connecté');
-      newSocket.emit('join');
+      newSocket.emit('join', { userId: currentUserId });
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('Erreur de connexion Socket.IO:', error);
-      toast.error('Erreur de connexion au serveur', { position: 'top-center', autoClose: 2000 });
+      toast.error('Erreur de connexion', { position: 'top-center', autoClose: 2000 });
     });
 
-    newSocket.on('receiveMessage', (message) => {
-      console.log('Message reçu:', message);
-      if (validateMessage(message)) {
-        const isCurrentConversation = String(selectedUser) === String(message.sender_id);
-        setMessages((prev) => {
-          if (prev.some((m) => String(m.id) === String(message.id))) {
-            return prev;
-          }
-          return [
-            ...prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')),
-            { ...message, created_at: new Date(message.created_at), unread: !isCurrentConversation },
-          ];
-        });
-        if (!isCurrentConversation) {
-          setUnreadMessages((prev) => ({
-            ...prev,
-            [message.sender_id]: (prev[message.sender_id] || 0) + 1,
-          }));
-        }
-        // Récupérer les utilisateurs manquants
-        if (!users[String(message.sender_id)] || !users[String(message.receiver_id)]) {
-          fetchMissingUser(String(message.sender_id));
-          fetchMissingUser(String(message.receiver_id));
-        }
-      } else {
-        console.warn('Message invalide reçu:', message);
-      }
-    });
-
-    newSocket.on('messageSent', (message) => {
-      console.log('Message envoyé:', message);
-      if (validateMessage(message)) {
-        setMessages((prev) => {
-          if (prev.some((m) => String(m.id) === String(message.id))) {
-            return prev;
-          }
-          return [
-            ...prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')),
-            { ...message, created_at: new Date(message.created_at), unread: false },
-          ];
-        });
-        if (!users[String(message.sender_id)] || !users[String(message.receiver_id)]) {
-          fetchMissingUser(String(message.sender_id));
-          fetchMissingUser(String(message.receiver_id));
-        }
-      } else {
-        console.warn('Message invalide envoyé:', message);
-      }
-    });
-
-    newSocket.on('error', (error) => {
-      console.error('Erreur Socket.IO:', error);
-      const errorMessage = error.details ? `${error.message}: ${error.details}` : error.message || 'Erreur de connexion';
-      toast.error(errorMessage, { position: 'top-center', autoClose: 3000 });
-      setMessages((prev) => prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')));
-    });
-
-    setSocket(newSocket);
-
-    const fetchUsers = async (messageUserIds = []) => {
-      try {
-        const query = messageUserIds.length > 0 ? `?ids=${messageUserIds.join(',')}` : '';
-        const response = await fetch(`http://localhost:3001/api/users${query}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-        console.log('Utilisateurs récupérés:', data);
-        if (response.ok) {
-          const userMap = data.reduce((acc, user) => {
-            if (user.id) {
-              const displayName =
-                user.prenom && user.nom
-                  ? `${user.prenom} ${user.nom}`
-                  : user.firstName && user.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user.prenom || user.nom || user.name || null;
-              if (displayName) {
-                acc[String(user.id)] = displayName;
-              }
-            }
-            return acc;
-          }, {});
-          console.log('User map:', userMap);
-          setUsers((prev) => ({ ...prev, ...userMap }));
-          // Vérifier les utilisateurs manquants
-          messageUserIds.forEach((id) => {
-            if (!userMap[id]) {
-              console.warn(`Utilisateur manquant dans userMap pour id: ${id}`);
-              fetchMissingUser(id);
-            }
-          });
-          return userMap;
-        } else {
-          throw new Error(data.message || 'Erreur lors de la récupération des utilisateurs');
-        }
-      } catch (error) {
-        console.error('Erreur fetch utilisateurs:', error);
-        toast.error('Impossible de charger les utilisateurs', { position: 'top-center', autoClose: 2000 });
-        return {};
-      }
-    };
-
-    const fetchMissingUser = async (userId, retryCount = 0) => {
-      if (!userId || users[userId]) return;
-      const maxRetries = 3;
+    const fetchMissingUser = async (userId) => {
+      if (!userId || users[String(userId)] || userId === currentUserId) return;
       try {
         const response = await fetch(`http://localhost:3001/api/users/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -162,36 +62,77 @@ const Chat = () => {
           const displayName =
             user.prenom && user.nom
               ? `${user.prenom} ${user.nom}`
-              : user.firstName && user.lastName
-              ? `${user.firstName} ${user.lastName}`
-              : user.prenom || user.nom || user.name || null;
-          if (displayName) {
-            setUsers((prev) => ({
-              ...prev,
-              [String(user.id)]: displayName,
-            }));
-            console.log(`Utilisateur ajouté pour id: ${userId}`, displayName);
-          } else {
-            throw new Error(`Nom complet non disponible pour l'utilisateur ${userId}`);
-          }
-        } else {
-          throw new Error(`Utilisateur non trouvé: ${userId}`);
-        }
-      } catch (error) {
-        console.error(`Erreur fetch utilisateur ${userId}:`, error);
-        if (retryCount < maxRetries) {
-          console.log(`Réessai ${retryCount + 1}/${maxRetries} pour utilisateur ${userId}`);
-          setTimeout(() => fetchMissingUser(userId, retryCount + 1), 1000);
-        } else {
-          console.warn(`Échec définitif pour récupérer l'utilisateur ${userId}`);
-          toast.error(`Impossible de charger l'utilisateur ${userId}`, { position: 'top-center', autoClose: 3000 });
+              : user.email || `Utilisateur ${userId}`;
           setUsers((prev) => ({
             ...prev,
-            [userId]: 'Utilisateur Non Trouvé',
+            [String(user.id)]: displayName,
           }));
         }
+      } catch (error) {
+        setUsers((prev) => ({
+          ...prev,
+          [String(userId)]: `Utilisateur ${userId}`,
+        }));
       }
     };
+
+    newSocket.on('receiveMessage', async (message) => {
+      if (validateMessage(message)) {
+        const normalizedMessage = {
+          id: String(message.id || `temp-received-${Date.now()}`),
+          sender_id: String(message.sender_id),
+          receiver_id: String(message.receiver_id),
+          content: message.content,
+          created_at: new Date(message.created_at || Date.now()),
+          unread: String(selectedUser) !== String(message.sender_id),
+        };
+        setMessages((prev) => {
+          if (!prev.some((m) => String(m.id) === String(normalizedMessage.id))) {
+            return [...prev, normalizedMessage];
+          }
+          return prev;
+        });
+        if (String(selectedUser) !== String(message.sender_id)) {
+          setUnreadMessages((prev) => ({
+            ...prev,
+            [String(message.sender_id)]: (prev[String(message.sender_id)] || 0) + 1,
+          }));
+        }
+        if (!users[String(message.sender_id)]) {
+          await fetchMissingUser(String(message.sender_id));
+        }
+      }
+    });
+
+    newSocket.on('messageSent', async (message) => {
+      if (validateMessage(message)) {
+        const normalizedMessage = {
+          id: String(message.id),
+          sender_id: String(message.sender_id),
+          receiver_id: String(message.receiver_id),
+          content: message.content,
+          created_at: new Date(message.created_at),
+          unread: false,
+        };
+        const tempId = message.tempId;
+
+        setMessages((prev) => {
+          return prev.map((m) =>
+            String(m.id) === String(tempId) ? normalizedMessage : m
+          );
+        });
+
+        if (!users[String(message.receiver_id)]) {
+          await fetchMissingUser(String(message.receiver_id));
+        }
+      }
+    });
+
+    newSocket.on('error', (error) => {
+      toast.error(error.message || 'Erreur de connexion', { position: 'top-center', autoClose: 2000 });
+    });
+
+    setSocket(newSocket);
 
     const fetchMessages = async () => {
       try {
@@ -200,157 +141,66 @@ const Chat = () => {
         });
         const data = await response.json();
         if (response.ok) {
-          const validMessages = data
-            .filter(validateMessage)
-            .map((msg) => ({
-              ...msg,
-              sender_id: String(msg.sender_id),
-              receiver_id: String(msg.receiver_id),
-              created_at: new Date(msg.created_at),
-              unread: false,
-            }));
+          const validMessages = data.filter(validateMessage).map((msg) => ({
+            id: String(msg.id),
+            sender_id: String(msg.sender_id),
+            receiver_id: String(msg.receiver_id),
+            content: msg.content,
+            created_at: new Date(msg.created_at || Date.now()),
+            unread: String(selectedUser) !== String(msg.sender_id),
+          }));
           setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => String(m.id)).filter((id) => id));
+            const existingIds = new Set(prev.map((m) => String(m.id)));
             const newMessages = validMessages.filter((msg) => !existingIds.has(String(msg.id)));
-            return [...prev.filter((m) => !m.id || !String(m.id).startsWith('temp-')), ...newMessages];
+            return [...prev, ...newMessages];
           });
-          // Extraire les user_id uniques des messages
+
           const messageUserIds = Array.from(
             new Set([
               ...validMessages.map((msg) => String(msg.sender_id)),
               ...validMessages.map((msg) => String(msg.receiver_id)),
             ])
           ).filter((id) => id !== String(currentUserId));
-          await fetchUsers(messageUserIds);
-        } else {
-          throw new Error(data.message || `Erreur lors du chargement des messages: ${response.statusText}`);
+          for (const id of messageUserIds) {
+            await fetchMissingUser(id);
+          }
         }
       } catch (error) {
-        console.error('Erreur fetch messages:', error);
-        const errorMessage = error.message.includes('404')
-          ? 'Service de messagerie indisponible'
-          : error.message;
-        toast.error(errorMessage, { position: 'top-center', autoClose: 3000 });
+        toast.error('Erreur chargement messages', { position: 'top-center', autoClose: 2000 });
       }
     };
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      await fetchMessages();
-      setIsLoading(false);
-    };
-
-    fetchData();
-
-    const refreshInterval = setInterval(fetchMessages, 30000);
+    fetchMessages().then(() => setIsLoading(false));
 
     return () => {
       newSocket.disconnect();
-      clearInterval(refreshInterval);
     };
   }, [navigate]);
 
-  useEffect(() => {
-    if (selectedUser) {
-      console.log('Selected user:', selectedUser, 'Name:', users[selectedUser]);
-      if (!users[selectedUser]) {
-        fetchMissingUser(selectedUser);
-      }
-      setMessages((prev) =>
-        prev.map((msg) =>
-          (msg.sender_id === String(selectedUser) && msg.receiver_id === String(currentUserId)) ||
-          (msg.receiver_id === String(selectedUser) && msg.sender_id === String(currentUserId))
-            ? { ...msg, unread: false }
-            : msg
-        )
-      );
-      setUnreadMessages((prev) => ({
-        ...prev,
-        [selectedUser]: 0,
-      }));
-    }
-  }, [selectedUser, users]);
-
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
-
   const handleSend = () => {
-    if (!content || !selectedUser) {
-      toast.error('Destinataire et message requis', { position: 'top-center', autoClose: 2000 });
-      return;
-    }
-
-    const receiverId = parseInt(selectedUser);
-    if (isNaN(receiverId) || receiverId <= 0) {
-      toast.error('Destinataire invalide', { position: 'top-center', autoClose: 2000 });
-      return;
-    }
-
-    if (!socket) {
-      toast.error('Connexion au serveur non établie', { position: 'top-center', autoClose: 2000 });
-      return;
-    }
+    if (!content || !selectedUser || !socket) return;
 
     const token = localStorage.getItem('token');
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const currentUserId = payload.id;
+    const currentUserId = String(JSON.parse(atob(token.split('.')[1])).id);
 
+    const tempId = `temp-${Date.now()}`;
     const tempMessage = {
-      id: `temp-${currentUserId}-${Date.now()}`,
-      sender_id: String(currentUserId),
-      receiver_id: String(receiverId),
+      id: tempId,
+      sender_id: currentUserId,
+      receiver_id: String(selectedUser),
       content,
       created_at: new Date(),
       unread: false,
     };
+
     setMessages((prev) => [...prev, tempMessage]);
-    socket.emit('sendMessage', { receiverId, content });
+    setTimeout(() => {
+      chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }, 50);
+
+    socket.emit('sendMessage', { receiverId: selectedUser, content, tempId });
     setContent('');
-    setShowEmojiPicker(false);
   };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    } else if (e.key === 'e' && e.ctrlKey) {
-      e.preventDefault();
-      setShowEmojiPicker(!showEmojiPicker);
-    }
-  };
-
-  const handleEmojiClick = (emojiObject) => {
-    setContent((prev) => prev + emojiObject.emoji);
-    textareaRef.current.focus();
-  };
-
-  const token = localStorage.getItem('token');
-  const currentUserId = token ? JSON.parse(atob(token.split('.')[1])).id : null;
-
-  const filteredMessages = selectedUser
-    ? messages.filter(
-        (msg) =>
-          (msg.sender_id === String(selectedUser) && msg.receiver_id === String(currentUserId)) ||
-          (msg.receiver_id === String(selectedUser) && msg.sender_id === String(currentUserId))
-      )
-    : [];
-
-  const filteredUsers = Object.entries(users).filter(([_, name]) =>
-    name && name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const conversations = Array.from(
-    new Set(
-      messages.map((msg) =>
-        msg.sender_id === String(currentUserId) ? msg.receiver_id : msg.sender_id
-      )
-    )
-  ).filter((id) => id !== String(currentUserId));
-
-  const hasUnreadMessages = Object.values(unreadMessages).some((count) => count > 0);
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 font-sans">
@@ -383,10 +233,10 @@ const Chat = () => {
 
       {isLoading ? (
         <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-300 animate-pulse text-lg">
-          Chargement des conversations...
+          Chargement...
         </div>
       ) : showUserSelect ? (
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-xl m-2 sm:m-4 transition-all duration-300">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-xl m-2 sm:m-4">
           <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white">Nouvelle conversation</h3>
           <input
             type="text"
@@ -399,19 +249,18 @@ const Chat = () => {
           {filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-300">
               <p className="text-lg mb-2">Aucun utilisateur trouvé</p>
-              <p className="text-sm">Vérifiez votre recherche ou ajoutez de nouveaux utilisateurs.</p>
             </div>
           ) : (
             filteredUsers.map(([id, name]) => (
               <div
                 key={id}
                 onClick={() => {
-                  console.log('Utilisateur sélectionné:', id, 'Nom:', name);
-                  setSelectedUser(id);
+                  console.log('Utilisateur sélectionné:', id, name);
+                  setSelectedUser(String(id));
                   setShowUserSelect(false);
                   setSearchQuery('');
                 }}
-                className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-gray-700 cursor-pointer rounded-lg transition duration-200"
+                className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-gray-700 cursor-pointer rounded-lg"
               >
                 <div className="w-12 h-12 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white text-lg font-semibold mr-4">
                   {name[0] || '?'}
@@ -419,31 +268,24 @@ const Chat = () => {
                 <div className="flex-1">
                   <div className="font-semibold text-lg text-gray-800 dark:text-white flex items-center">
                     {name}
-                    {(unreadMessages[id] || 0) > 0 && (
-                      <span className="ml-2 w-3 h-3 bg-red-500 rounded-full animate-pulse" aria-label="Nouveau message"></span>
+                    {(unreadMessages[String(id)] || 0) > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1">
+                        {unreadMessages[String(id)]}
+                      </span>
                     )}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs">
                     {messages
-                      .filter((msg) => msg.sender_id === id || msg.receiver_id === id)
+                      .filter((msg) => String(msg.sender_id) === String(id) || String(msg.receiver_id) === String(id))
                       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]?.content || 'Aucun message'}
                   </div>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {messages
-                    .filter((msg) => msg.sender_id === id || msg.receiver_id === id)
-                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-                    ?.created_at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
                 </div>
               </div>
             ))
           )}
           <button
-            onClick={() => {
-              setShowUserSelect(false);
-              setSearchQuery('');
-            }}
-            className="mt-6 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold transition duration-200"
+            onClick={() => setShowUserSelect(false)}
+            className="mt-6 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold"
             aria-label="Annuler"
           >
             Annuler
@@ -454,39 +296,35 @@ const Chat = () => {
           {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-300">
               <p className="text-lg mb-2">Aucune conversation</p>
-              <p className="text-sm">Commencez une nouvelle conversation en cliquant sur le bouton +.</p>
+              <p className="text-sm">Cliquez sur + pour commencer.</p>
             </div>
           ) : (
             conversations.map((userId) => (
               <div
                 key={userId}
                 onClick={() => {
-                  console.log('Conversation sélectionnée:', userId, 'Nom:', users[userId]);
+                  console.log('Conversation sélectionnée:', userId, users[String(userId)]);
                   setSelectedUser(String(userId));
                 }}
-                className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-gray-700 cursor-pointer rounded-lg transition duration-200"
+                className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-gray-700 cursor-pointer rounded-lg"
               >
                 <div className="w-12 h-12 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white text-lg font-semibold mr-4">
-                  {(users[userId] || 'Chargement...')[0] || '?'}
+                  {(users[String(userId)] || `Utilisateur ${userId}`)[0] || '?'}
                 </div>
                 <div className="flex-1">
                   <div className="font-semibold text-lg text-gray-800 dark:text-white flex items-center">
-                    {users[userId] || 'Chargement...'}
-                    {(unreadMessages[userId] || 0) > 0 && (
-                      <span className="ml-2 w-3 h-3 bg-red-500 rounded-full animate-pulse" aria-label="Nouveau message"></span>
+                    {users[String(userId)] || `Utilisateur ${userId}`}
+                    {(unreadMessages[String(userId)] || 0) > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-1">
+                        {unreadMessages[String(userId)]}
+                      </span>
                     )}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs">
                     {messages
-                      .filter((msg) => msg.sender_id === userId || msg.receiver_id === userId)
+                      .filter((msg) => String(msg.sender_id) === String(userId) || String(msg.receiver_id) === String(userId))
                       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]?.content || 'Aucun message'}
                   </div>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {messages
-                    .filter((msg) => msg.sender_id === userId || msg.receiver_id === userId)
-                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-                    ?.created_at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
                 </div>
               </div>
             ))
@@ -497,7 +335,7 @@ const Chat = () => {
           <div className="bg-green-700 dark:bg-green-900 text-white p-4 flex items-center justify-between shadow-lg sticky top-0 z-10">
             <button
               onClick={() => setSelectedUser(null)}
-              className="text-white p-2 hover:bg-green-600 dark:hover:bg-green-800 rounded-full transition duration-200"
+              className="text-white p-2 hover:bg-green-600 dark:hover:bg-green-800 rounded-full"
               aria-label="Retour"
             >
               <svg
@@ -511,7 +349,7 @@ const Chat = () => {
               </svg>
             </button>
             <h2 className="text-xl font-semibold truncate">
-              Discussion avec {users[selectedUser] || 'Chargement...'}
+              Discussion avec {users[String(selectedUser)] || `Utilisateur ${selectedUser}`}
             </h2>
             <div className="w-6"></div>
           </div>
@@ -521,33 +359,34 @@ const Chat = () => {
           >
             {filteredMessages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-600 dark:text-gray-300 text-lg">
-                Aucun message pour le moment. Envoyez un message pour commencer la discussion !
+                Aucun message. Envoyez un message pour commencer !
               </div>
             ) : (
               filteredMessages.map((msg) => (
                 <div
                   key={String(msg.id)}
-                  className={`flex mb-4 ${msg.sender_id === String(currentUserId) ? 'justify-end' : 'justify-start'}`}
+                  className={`flex mb-4 ${String(msg.sender_id) === String(currentUserId) ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className="flex items-start space-x-3 max-w-[75%]">
-                    {msg.sender_id !== String(currentUserId) && (
+                    {String(msg.sender_id) !== String(currentUserId) && (
                       <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white font-semibold">
-                        {(users[msg.sender_id] || 'Chargement...')[0] || '?'}
+                        {(users[String(msg.sender_id)] || `Utilisateur ${msg.sender_id}`)[0] || '?'}
                       </div>
                     )}
                     <div
                       className={`p-4 rounded-2xl shadow-md ${
-                        msg.sender_id === String(currentUserId)
+                        String(msg.sender_id) === String(currentUserId)
                           ? 'bg-green-100 dark:bg-green-700 text-gray-800 dark:text-white'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'
-                      }`}
+                      } ${msg.unread ? 'border-l-4 border-red-500' : ''}`}
                     >
-                      <div className={`text-sm ${msg.unread ? 'font-bold' : ''}`}>
-                        <span className="font-bold">{users[msg.sender_id] || 'Chargement...'}: </span>
+                      <div className="text-sm">
+                        <span className="font-bold">{users[String(msg.sender_id)] || `Utilisateur ${msg.sender_id}`}: </span>
                         {msg.content}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {new Date(msg.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}
+                        {msg.unread && <span className="ml-2 text-red-500 font-semibold">Non lu</span>}
                       </div>
                     </div>
                   </div>
@@ -563,8 +402,8 @@ const Chat = () => {
             )}
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="text-gray-600 dark:text-gray-300 p-2 hover:text-green-600 dark:hover:text-green-400 rounded-full transition duration-200"
-              aria-label="Afficher/masquer le sélecteur d'émojis"
+              className="text-gray-600 dark:text-gray-300 p-2 hover:text-green-600 dark:hover:text-green-400 rounded-full"
+              aria-label="Émojis"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -583,7 +422,7 @@ const Chat = () => {
             </button>
             <textarea
               ref={textareaRef}
-              placeholder={`Envoyer un message à ${users[selectedUser] || 'Chargement...'}...`}
+              placeholder={`Envoyer un message à ${users[String(selectedUser)] || `Utilisateur ${selectedUser}`}...`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyPress}
@@ -592,8 +431,8 @@ const Chat = () => {
             />
             <button
               onClick={handleSend}
-              className="bg-green-600 dark:bg-green-800 text-white p-3 rounded-full hover:bg-green-700 dark:hover:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 transition duration-200"
-              aria-label="Envoyer le message"
+              className="bg-green-600 dark:bg-green-800 text-white p-3 rounded-full hover:bg-green-700 dark:hover:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
+              aria-label="Envoyer"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

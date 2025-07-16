@@ -55,7 +55,7 @@ io.use((socket, next) => {
   }
   try {
     const jwt = require('jsonwebtoken');
-    const payload = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET || 'your_jwt_secret');
+    const payload = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET || 'SuperClé123!');
     socket.userId = payload.id;
     next();
   } catch (err) {
